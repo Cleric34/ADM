@@ -6,6 +6,7 @@ grid-based tactical coordination environment with dynamic entry gates, exit gate
 defenders with inward-scaling power, and Jayadratha's gate-blocking mechanism.
 """
 
+from collections import deque
 from dataclasses import dataclass, field
 from typing import Dict, List, Tuple, Optional, Set, Any
 import numpy as np
@@ -23,20 +24,19 @@ class Config:
     comm_range: float = 6.0     # Low: 4.0, High: 15.0
     vision_radius: float = 4.0
     num_followers: int = 4
-    max_steps: int = 150
+    max_steps: int = 400        # Accommodates full inward (105 steps) + outward (116 steps) journeys
     
-    # Base combat stats
-    abhimanyu_health: int = 120
-    abhimanyu_attack: int = 35
-    follower_health: int = 70
-    follower_attack: int = 20
+    # Rebalanced combat stats for calibrated survival dynamics
+    abhimanyu_health: int = 220
+    abhimanyu_attack: int = 40
+    follower_health: int = 100
+    follower_attack: int = 25
     
-    # Defenders per ring mapping by difficulty
-    # Ring 1 is innermost, Ring 7 is outermost
+    # Defenders per ring mapping by difficulty (Ring 1 innermost Maharathis, Ring 7 outermost perimeter)
     defenders_per_ring: Dict[str, Dict[int, int]] = field(default_factory=lambda: {
-        "low":    {1: 2, 2: 2, 3: 3, 4: 3, 5: 4, 6: 4, 7: 5},
-        "medium": {1: 3, 2: 4, 3: 5, 4: 5, 5: 6, 6: 7, 7: 8},
-        "high":   {1: 5, 2: 6, 3: 7, 4: 8, 5: 9, 6: 10, 7: 12},
+        "low":    {1: 1, 2: 2, 3: 2, 4: 3, 5: 3, 6: 3, 7: 4},
+        "medium": {1: 2, 2: 3, 3: 3, 4: 4, 5: 4, 6: 5, 7: 6},
+        "high":   {1: 3, 2: 4, 3: 5, 4: 5, 5: 6, 6: 7, 7: 8},
     })
 
 
@@ -56,13 +56,15 @@ class ChakravyuhaEnvironment:
         self.center = (self.grid_size // 2, self.grid_size // 2)
         
         # Radii of concentric rings: Ring 1 (inner) to Ring 7 (outer)
-        # Ring 1 radius: 2, Ring 2: 4, ..., Ring 7: 14
         self.ring_radii = {r: r * 2 for r in range(1, config.num_rings + 1)}
         
         # Ring cells and gates
         self.ring_cells: Dict[int, Set[Tuple[int, int]]] = {}
         self.entry_gates: Dict[int, Tuple[int, int]] = {}
         self.exit_gates: Dict[int, Tuple[int, int]] = {}
+        
+        # Distance map cache for fast pathfinding
+        self._distance_maps: Dict[Tuple[int, int], np.ndarray] = {}
         
         # Jayadratha state: triggers after the first Pandava enters Ring 7
         self.jayadratha_active = False
@@ -81,25 +83,20 @@ class ChakravyuhaEnvironment:
             cells = set()
             for x in range(cx - rad, cx + rad + 1):
                 for y in range(cy - rad, cy + rad + 1):
-                    # Chebyshev perimeter for concentric square ring
                     if max(abs(x - cx), abs(y - cy)) == rad:
                         if 0 <= x < self.grid_size and 0 <= y < self.grid_size:
                             cells.add((x, y))
             self.ring_cells[r] = cells
             
-            # Select entry gate on each ring (staggered angular positions to represent spiral labyrinth)
-            # Pick a deterministic random gate cell along each ring using seed
             ring_cell_list = sorted(list(cells))
             entry_idx = self.rng.randint(0, len(ring_cell_list))
             entry_gate = ring_cell_list[entry_idx]
             self.entry_gates[r] = entry_gate
             
-            # Exit gate is placed at an opposing or scout-required sector on the ring
-            # (different from entry gate, representing the hidden/changing exit path)
             exit_idx = (entry_idx + len(ring_cell_list) // 2) % len(ring_cell_list)
             self.exit_gates[r] = ring_cell_list[exit_idx]
         
-        # Jayadratha will block the outermost gate (Ring 7 entry gate)
+        # Jayadratha blocks the outermost gate (Ring 7 entry gate)
         self.jayadratha_pos = self.entry_gates[self.config.num_rings]
 
     def get_ring_of_point(self, pos: Tuple[int, int]) -> int:
@@ -116,25 +113,23 @@ class ChakravyuhaEnvironment:
         for r in range(1, self.config.num_rings + 1):
             if dist <= self.ring_radii[r]:
                 return r
-        return self.config.num_rings + 1  # Outside formation
+        return self.config.num_rings + 1
 
     def is_wall(self, pos: Tuple[int, int]) -> bool:
         """
         Checks if a cell is an impassable formation wall.
         Ring perimeter cells are walls UNLESS they are an open entry/exit gate.
-        If Jayadratha is active, the main outer entry gate is blocked by Jayadratha!
+        If Jayadratha is active, the main outer entry gate is blocked by Jayadratha.
         """
         x, y = pos
         if not (0 <= x < self.grid_size and 0 <= y < self.grid_size):
-            return True  # Out of bounds is impassable
+            return True
             
-        # Jayadratha blocks the outer gate cell
         if self.jayadratha_active and pos == self.jayadratha_pos:
             return True
             
         for r in range(1, self.config.num_rings + 1):
             if pos in self.ring_cells[r]:
-                # Gates are passable gaps in the wall
                 if pos == self.entry_gates[r] or pos == self.exit_gates[r]:
                     return False
                 return True
@@ -150,12 +145,35 @@ class ChakravyuhaEnvironment:
             if agent_ring <= self.config.num_rings:
                 self.first_breach_occurred = True
                 self.jayadratha_active = True
+                self._distance_maps.clear()  # Invalidate distance maps when wall state changes
+
+    def get_distance_map(self, target: Tuple[int, int]) -> np.ndarray:
+        """Computes / retrieves cached BFS distance map from target to all grid cells."""
+        if target in self._distance_maps:
+            return self._distance_maps[target]
+
+        dist_map = np.full((self.grid_size, self.grid_size), 9999, dtype=np.int32)
+        if 0 <= target[0] < self.grid_size and 0 <= target[1] < self.grid_size:
+            dist_map[target] = 0
+            queue = deque([target])
+            while queue:
+                cx, cy = queue.popleft()
+                d = dist_map[cx, cy]
+                for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)]:
+                    nx, ny = cx + dx, cy + dy
+                    if 0 <= nx < self.grid_size and 0 <= ny < self.grid_size:
+                        if dist_map[nx, ny] == 9999:
+                            if not self.is_wall((nx, ny)) or (nx, ny) == target:
+                                dist_map[nx, ny] = d + 1
+                                queue.append((nx, ny))
+
+        self._distance_maps[target] = dist_map
+        return dist_map
 
     def render_ascii(self, attackers: List[Any], defenders: List[Any]) -> str:
         """Renders an ASCII text grid representation of the simulation state."""
         grid = [["." for _ in range(self.grid_size)] for _ in range(self.grid_size)]
         
-        # Draw ring walls
         for r in range(1, self.config.num_rings + 1):
             for x, y in self.ring_cells[r]:
                 grid[x][y] = "▓"
@@ -164,22 +182,18 @@ class ChakravyuhaEnvironment:
             ex, ey = self.exit_gates[r]
             grid[ex][ey] = "E"
             
-        # Center
         cx, cy = self.center
         grid[cx][cy] = "★"
         
-        # Jayadratha
         if self.jayadratha_active and self.jayadratha_pos:
             jx, jy = self.jayadratha_pos
             grid[jx][jy] = "J"
             
-        # Defenders
         for d in defenders:
             if d.is_alive:
                 dx, dy = d.pos
                 grid[dx][dy] = "D"
                 
-        # Attackers
         for a in attackers:
             if a.is_alive:
                 ax, ay = a.pos
@@ -205,9 +219,8 @@ class ChakravyuhaEnvironment:
         ax.set_facecolor("#121824")
         ax.set_xlim(-0.5, self.grid_size - 0.5)
         ax.set_ylim(-0.5, self.grid_size - 0.5)
-        ax.invert_yaxis()  # Match matrix grid coordinates (top-to-bottom)
+        ax.invert_yaxis()
 
-        # Plot ring wall cells
         ring_colors = ["#4A5568", "#2B6CB0", "#2C5282", "#2A4365", "#1A365D", "#1E3A8A", "#172554"]
         for r in range(1, self.config.num_rings + 1):
             color = ring_colors[(r - 1) % len(ring_colors)]
@@ -215,18 +228,14 @@ class ChakravyuhaEnvironment:
             ys = [pos[0] for pos in self.ring_cells[r] if pos != self.entry_gates[r] and pos != self.exit_gates[r]]
             ax.scatter(xs, ys, c=color, s=25, marker="s", alpha=0.6, label=f"Ring {r}" if step_num == 0 and r == 1 else None)
             
-            # Entry Gate
             eg = self.entry_gates[r]
             ax.scatter(eg[1], eg[0], c="#48BB78", s=60, marker="o", edgecolors="white", linewidths=1.2, zorder=4)
-            # Exit Gate
             ex = self.exit_gates[r]
             ax.scatter(ex[1], ex[0], c="#38B2AC", s=50, marker="v", edgecolors="white", linewidths=1.0, zorder=4)
 
-        # Center target
         cx, cy = self.center
         ax.scatter(cy, cx, c="#ECC94B", s=180, marker="*", edgecolors="#D69E2E", linewidths=1.5, zorder=6, label="Center (Core)")
 
-        # Jayadratha
         if self.jayadratha_active and self.jayadratha_pos:
             jx, jy = self.jayadratha_pos
             ax.scatter(jy, jx, c="#E53E3E", s=130, marker="X", edgecolors="white", linewidths=2.0, zorder=7, label="Jayadratha (Gate Locked)")
@@ -234,16 +243,13 @@ class ChakravyuhaEnvironment:
             jx, jy = self.jayadratha_pos
             ax.scatter(jy, jx, c="#CBD5E0", s=60, marker="s", alpha=0.3, zorder=3)
 
-        # Defenders
         alive_defenders = [d for d in defenders if d.is_alive]
         if alive_defenders:
             dxs = [d.pos[1] for d in alive_defenders]
             dys = [d.pos[0] for d in alive_defenders]
-            # Color defenders by inner ring strength
             def_colors = [d.strength_color for d in alive_defenders]
             ax.scatter(dxs, dys, c=def_colors, s=50, marker="^", edgecolors="#FEB2B2", linewidths=1.0, zorder=5, label="Kaurava Defenders")
 
-        # Attackers
         for a in attackers:
             if a.is_alive:
                 if a.role == "infiltrator":

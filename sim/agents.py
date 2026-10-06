@@ -70,8 +70,8 @@ class Attacker(Agent):
         agent_id: str,
         role: str,
         pos: Tuple[int, int],
-        health: int = 100,
-        attack_power: int = 30,
+        health: int = 220,
+        attack_power: int = 40,
         vision_radius: float = 4.0,
         comm_range: float = 6.0,
         known_entry_gates: Optional[Dict[int, Tuple[int, int]]] = None,
@@ -88,17 +88,18 @@ class Attacker(Agent):
         self.role = role
         
         # Knowledge state under incomplete information
-        # Abhimanyu knows all entry gates, but NOT exit gates.
         self.known_entry_gates: Dict[int, Tuple[int, int]] = (
             dict(known_entry_gates) if known_entry_gates is not None else {}
         )
         self.known_exit_gates: Dict[int, Tuple[int, int]] = {}
         
-        # Mission progression state
-        self.current_target_ring = 7  # Start by targeting Ring 7 entry, down to 1 then center (0)
-        self.has_reached_center = False
-        self.has_exited = False
-        self.highest_ring_breached = 0  # 0: none, 7: outer, 1: innermost, 0: center
+        # Stateful waypoint targets
+        self.target_entry_ring: int = 7
+        self.target_exit_ring: int = 1
+        self.current_target_ring: int = 7
+        self.has_reached_center: bool = False
+        self.has_exited: bool = False
+        self.highest_ring_breached: int = 0
         
         # Communication inbox and outbox
         self.inbox: List[Dict[str, Any]] = []
@@ -116,12 +117,10 @@ class Attacker(Agent):
     def process_inbox(self) -> None:
         """Integrates information received from other agents."""
         for msg in self.inbox:
-            # Update known entry gates
             if "entry_gates" in msg:
                 for ring, gate_pos in msg["entry_gates"].items():
                     if ring not in self.known_entry_gates:
                         self.known_entry_gates[ring] = gate_pos
-            # Update known exit gates
             if "exit_gates" in msg:
                 for ring, gate_pos in msg["exit_gates"].items():
                     if ring not in self.known_exit_gates:
@@ -133,7 +132,6 @@ class Attacker(Agent):
         if not self.is_alive:
             return
             
-        # Check all ring gates in environment to see if within vision radius
         for r, gate_pos in env.entry_gates.items():
             if self.can_see(gate_pos):
                 self.known_entry_gates[r] = gate_pos
@@ -146,7 +144,7 @@ class Attacker(Agent):
 class Defender(Agent):
     """
     Kaurava warrior defending a specific concentric ring of the formation.
-    Inner ring defenders (Ring 1, Drona's core) have significantly higher health and attack power.
+    Inner ring defenders (Ring 1, Drona's core) have higher health and attack power.
     """
 
     def __init__(
@@ -159,11 +157,11 @@ class Defender(Agent):
     ) -> None:
         self.layer = layer  # 1 (innermost) to 7 (outermost)
         
-        # Power scaling: Inner rings are veteran Maharathis (Drona, Karna, Ashwatthama)
-        # Ring 7: HP 35, ATK 12 | Ring 1: HP 95, ATK 36
+        # Power scaling: Inner rings house veteran Maharathis
+        # Layer 7: HP 19, ATK 8 | Layer 1: HP 43, ATK 20
         power_scale = 8 - layer  # 1 for layer 7, 7 for layer 1
-        health = 25 + power_scale * 10
-        attack = 10 + power_scale * 4
+        health = 15 + power_scale * 4
+        attack = 6 + power_scale * 2
         
         super().__init__(
             agent_id=agent_id,
@@ -175,14 +173,13 @@ class Defender(Agent):
             comm_range=comm_range,
         )
         
-        # Color mapping for visualization: darker/richer red for stronger inner guards
         colors = {
-            1: "#9B2C2C",  # Deep Crimson (Maharathi)
+            1: "#9B2C2C",
             2: "#C53030",
             3: "#E53E3E",
             4: "#F56565",
             5: "#FC8181",
             6: "#FEB2B2",
-            7: "#FED7D7",  # Light Pink (Outer perimeter guard)
+            7: "#FED7D7",
         }
         self.strength_color = colors.get(layer, "#E53E3E")

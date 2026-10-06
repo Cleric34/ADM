@@ -2,14 +2,13 @@
 sim/strategies.py - Attacker Multi-Agent Coordination Strategies.
 
 Implements tactical strategies under incomplete information:
-1. `oracle`: Idealized baseline where every attacker knows all entry and exit gates.
+1. `oracle`: Idealized baseline where all attackers know all entry and exit gates.
 2. `lone_entry`: Abhimanyu enters the formation completely alone.
 3. `blind_follow`: Followers trail Abhimanyu's position with zero communication.
 4. `shared_map`: Agents continuously broadcast discovered entry and exit gates over the message channel.
 5. `split_exit`: A designated scout subgroup explores outer rings to find exit routes while the strike force penetrates inwards.
 """
 
-from collections import deque
 from typing import List, Dict, Tuple, Optional, Any, Set
 import numpy as np
 from sim.agents import Attacker, Defender, Agent
@@ -23,50 +22,72 @@ def bfs_next_step(
     occupied: Optional[Set[Tuple[int, int]]] = None,
 ) -> Tuple[int, int]:
     """
-    Breadth-First Search pathfinding navigating around concentric formation walls
-    to determine the optimal next grid step towards the target waypoint.
+    Fast BFS pathfinding using cached distance maps on static waypoints.
     """
     if start == target:
         return start
     if occupied is None:
         occupied = set()
 
-    queue = deque([start])
-    visited = {start: None}
+    dist_map = env.get_distance_map(target)
+    cx, cy = start
+    current_dist = dist_map[cx, cy]
 
-    while queue:
-        curr = queue.popleft()
-        if curr == target:
-            break
-        cx, cy = curr
+    if current_dist >= 9999:
+        candidates = []
         for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)]:
             nx, ny = cx + dx, cy + dy
             if 0 <= nx < env.grid_size and 0 <= ny < env.grid_size:
-                if (nx, ny) not in visited:
-                    if not env.is_wall((nx, ny)) or (nx, ny) == target:
-                        visited[(nx, ny)] = curr
-                        queue.append((nx, ny))
-
-    if target not in visited:
-        candidates = []
-        for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)]:
-            nx, ny = start[0] + dx, start[1] + dy
-            if 0 <= nx < env.grid_size and 0 <= ny < env.grid_size:
                 if not env.is_wall((nx, ny)):
-                    dist = (nx - target[0]) ** 2 + (ny - target[1]) ** 2
-                    candidates.append((dist, (nx, ny)))
+                    d = (nx - target[0]) ** 2 + (ny - target[1]) ** 2
+                    candidates.append((d, (nx, ny)))
         if candidates:
             candidates.sort(key=lambda x: x[0])
             return candidates[0][1]
         return start
 
-    curr = target
-    path = []
-    while curr is not None:
-        path.append(curr)
-        curr = visited[curr]
-    path.reverse()
-    return path[1] if len(path) > 1 else start
+    best_step = start
+    best_dist = current_dist
+
+    for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)]:
+        nx, ny = cx + dx, cy + dy
+        if 0 <= nx < env.grid_size and 0 <= ny < env.grid_size:
+            if not env.is_wall((nx, ny)) or (nx, ny) == target:
+                d = dist_map[nx, ny]
+                penalty = 1 if (nx, ny) in occupied else 0
+                if d + penalty < best_dist:
+                    best_dist = d + penalty
+                    best_step = (nx, ny)
+
+    return best_step
+
+
+def greedy_step_towards(
+    start: Tuple[int, int],
+    target: Tuple[int, int],
+    env: ChakravyuhaEnvironment,
+    occupied: Optional[Set[Tuple[int, int]]] = None,
+) -> Tuple[int, int]:
+    """Lightweight 1-step move towards dynamic moving targets."""
+    if start == target:
+        return start
+    if occupied is None:
+        occupied = set()
+        
+    cx, cy = start
+    tx, ty = target
+    candidates = []
+    for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)]:
+        nx, ny = cx + dx, cy + dy
+        if 0 <= nx < env.grid_size and 0 <= ny < env.grid_size:
+            if not env.is_wall((nx, ny)):
+                d = (nx - tx) ** 2 + (ny - ty) ** 2
+                penalty = 5 if (nx, ny) in occupied else 0
+                candidates.append((d + penalty, (nx, ny)))
+    if candidates:
+        candidates.sort(key=lambda x: x[0])
+        return candidates[0][1]
+    return start
 
 
 def get_next_step_towards(
@@ -75,7 +96,7 @@ def get_next_step_towards(
     env: ChakravyuhaEnvironment,
     occupied_positions: Set[Tuple[int, int]],
 ) -> Tuple[int, int]:
-    """Compatibility alias wrapping BFS next step."""
+    """Compatibility wrapper."""
     return bfs_next_step(current_pos, target_pos, env, occupied_positions)
 
 
@@ -110,7 +131,6 @@ class OracleStrategy(BaseStrategy):
         g7 = env.entry_gates[7]
         start_pos = (min(config.grid_size - 1, g7[0] + 2), g7[1])
 
-        team = []
         abhimanyu = Attacker(
             agent_id="oracle_abhimanyu",
             role="infiltrator",
@@ -124,8 +144,7 @@ class OracleStrategy(BaseStrategy):
         abhimanyu.known_exit_gates = dict(env.exit_gates)
         abhimanyu.target_entry_ring = 7
         abhimanyu.target_exit_ring = 1
-        team.append(abhimanyu)
-        return team
+        return [abhimanyu]
 
     def coordinate_and_step(
         self,
@@ -157,9 +176,9 @@ class OracleStrategy(BaseStrategy):
                     target = env.exit_gates[a.target_exit_ring]
                     if a.pos == target:
                         a.target_exit_ring += 1
-                        target = env.exit_gates[a.target_exit_ring] if a.target_exit_ring <= 7 else (0, a.pos[1])
+                        target = env.exit_gates[a.target_exit_ring] if a.target_exit_ring <= 7 else env.exit_gates[7]
                 else:
-                    target = (0, a.pos[1]) if a.pos[0] < env.center[0] else (env.grid_size - 1, a.pos[1])
+                    target = env.exit_gates[7]
 
             next_pos = bfs_next_step(a.pos, target, env, occupied)
             a.pos = next_pos
@@ -176,7 +195,7 @@ class OracleStrategy(BaseStrategy):
                 a.has_reached_center = True
                 a.highest_ring_breached = 7
 
-            if a.has_reached_center and current_ring > config.num_rings:
+            if a.has_reached_center and (current_ring > config.num_rings or a.target_exit_ring > 7):
                 a.has_exited = True
 
         return 0
@@ -236,12 +255,13 @@ class LoneEntryStrategy(BaseStrategy):
                 else:
                     target = env.center
             else:
-                # Exiting phase: use scouted exit gates if known; otherwise head towards border
-                current_ring = env.get_ring_of_point(a.pos)
-                if current_ring in a.known_exit_gates:
-                    target = a.known_exit_gates[current_ring]
+                if a.target_exit_ring in a.known_exit_gates:
+                    target = a.known_exit_gates[a.target_exit_ring]
+                    if a.pos == target:
+                        a.target_exit_ring += 1
+                        target = a.known_exit_gates.get(a.target_exit_ring, env.exit_gates[7])
                 else:
-                    target = (0, a.pos[1]) if a.pos[0] < env.center[0] else (env.grid_size - 1, a.pos[1])
+                    target = env.exit_gates[7]
 
             next_pos = bfs_next_step(a.pos, target, env, occupied)
             a.pos = next_pos
@@ -258,7 +278,7 @@ class LoneEntryStrategy(BaseStrategy):
                 a.has_reached_center = True
                 a.highest_ring_breached = 7
 
-            if a.has_reached_center and current_ring > config.num_rings:
+            if a.has_reached_center and (current_ring > config.num_rings or a.target_exit_ring > 7):
                 a.has_exited = True
 
         return 0
@@ -336,15 +356,18 @@ class BlindFollowStrategy(BaseStrategy):
                     else:
                         target = env.center
                 else:
-                    current_ring = env.get_ring_of_point(a.pos)
-                    if current_ring in a.known_exit_gates:
-                        target = a.known_exit_gates[current_ring]
+                    if a.target_exit_ring in a.known_exit_gates:
+                        target = a.known_exit_gates[a.target_exit_ring]
+                        if a.pos == target:
+                            a.target_exit_ring += 1
+                            target = a.known_exit_gates.get(a.target_exit_ring, env.exit_gates[7])
                     else:
-                        target = (0, a.pos[1]) if a.pos[0] < env.center[0] else (env.grid_size - 1, a.pos[1])
+                        target = env.exit_gates[7]
+                next_pos = bfs_next_step(a.pos, target, env, occupied)
             else:
-                target = abhimanyu.pos if abhimanyu.is_alive else env.center
+                target = abhimanyu.pos if abhimanyu.is_alive else env.entry_gates[7]
+                next_pos = greedy_step_towards(a.pos, target, env, occupied)
 
-            next_pos = bfs_next_step(a.pos, target, env, occupied)
             a.pos = next_pos
             occupied.add(next_pos)
 
@@ -359,7 +382,7 @@ class BlindFollowStrategy(BaseStrategy):
                 a.has_reached_center = True
                 a.highest_ring_breached = 7
 
-            if a.has_reached_center and current_ring > config.num_rings:
+            if a.has_reached_center and (current_ring > config.num_rings or a.target_exit_ring > 7):
                 a.has_exited = True
 
         return 0
@@ -453,15 +476,15 @@ class SharedMapStrategy(BaseStrategy):
                         a.target_entry_ring -= 1
                         target = a.known_entry_gates.get(a.target_entry_ring, env.center)
                 else:
-                    target = env.center
+                    target = a.known_entry_gates.get(7, env.entry_gates[7])
             else:
                 if a.target_exit_ring in a.known_exit_gates:
                     target = a.known_exit_gates[a.target_exit_ring]
                     if a.pos == target:
                         a.target_exit_ring += 1
-                        target = a.known_exit_gates.get(a.target_exit_ring, (0, a.pos[1]))
+                        target = a.known_exit_gates.get(a.target_exit_ring, env.exit_gates[7])
                 else:
-                    target = (0, a.pos[1]) if a.pos[0] < env.center[0] else (env.grid_size - 1, a.pos[1])
+                    target = env.exit_gates[7]
 
             next_pos = bfs_next_step(a.pos, target, env, occupied)
             a.pos = next_pos
@@ -478,7 +501,7 @@ class SharedMapStrategy(BaseStrategy):
                 a.has_reached_center = True
                 a.highest_ring_breached = 7
 
-            if a.has_reached_center and current_ring > config.num_rings:
+            if a.has_reached_center and (current_ring > config.num_rings or a.target_exit_ring > 7):
                 a.has_exited = True
 
         return messages_sent
@@ -604,9 +627,9 @@ class SplitExitStrategy(BaseStrategy):
                         target = a.known_exit_gates[a.target_exit_ring]
                         if a.pos == target:
                             a.target_exit_ring += 1
-                            target = a.known_exit_gates.get(a.target_exit_ring, (0, a.pos[1]))
+                            target = a.known_exit_gates.get(a.target_exit_ring, env.exit_gates[7])
                     else:
-                        target = (0, a.pos[1]) if a.pos[0] < env.center[0] else (env.grid_size - 1, a.pos[1])
+                        target = env.exit_gates[7]
 
             next_pos = bfs_next_step(a.pos, target, env, occupied)
             a.pos = next_pos
@@ -623,7 +646,7 @@ class SplitExitStrategy(BaseStrategy):
                 a.has_reached_center = True
                 a.highest_ring_breached = 7
 
-            if a.has_reached_center and current_ring > config.num_rings:
+            if a.has_reached_center and (current_ring > config.num_rings or a.target_exit_ring > 7):
                 a.has_exited = True
 
         return messages_sent
