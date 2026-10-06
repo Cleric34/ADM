@@ -128,3 +128,12 @@ def test_all_strategies_run():
         assert 0 <= res["rings_breached"] <= 7
         assert res["steps"] > 0
         assert res["survivors"] >= 0
+
+
+def test_shared_map_breaches_center_and_navigates_exit():
+    """Verify that shared_map reaches the center (ring 7 breached) and attempts exit navigation."""
+    config = Config(seed=10001, difficulty="low", max_steps=400)
+    res = run_episode(config, "shared_map")
+    assert res["rings_breached"] == 7, "Shared map must reach center under low difficulty"
+    assert res["outcome"] == "success", "Shared map should succeed on seed 10001 after exit bug fix"
+

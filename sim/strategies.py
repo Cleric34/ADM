@@ -195,7 +195,7 @@ class OracleStrategy(BaseStrategy):
                 a.has_reached_center = True
                 a.highest_ring_breached = 7
 
-            if a.has_reached_center and (current_ring > config.num_rings or a.target_exit_ring > 7):
+            if a.has_reached_center and (a.pos == env.exit_gates[7] or current_ring > config.num_rings or a.target_exit_ring > 7):
                 a.has_exited = True
 
         return 0
@@ -255,11 +255,18 @@ class LoneEntryStrategy(BaseStrategy):
                 else:
                     target = env.center
             else:
-                if a.target_exit_ring in a.known_exit_gates:
-                    target = a.known_exit_gates[a.target_exit_ring]
-                    if a.pos == target:
-                        a.target_exit_ring += 1
-                        target = a.known_exit_gates.get(a.target_exit_ring, env.exit_gates[7])
+                if a.target_exit_ring <= 7:
+                    if a.target_exit_ring in a.known_exit_gates:
+                        target = a.known_exit_gates[a.target_exit_ring]
+                        if a.pos == target:
+                            a.target_exit_ring += 1
+                            target = a.known_exit_gates.get(a.target_exit_ring, env.exit_gates[7]) if a.target_exit_ring <= 7 else env.exit_gates[7]
+                    else:
+                        target = env.exit_gates[7]
+                        for r in range(a.target_exit_ring + 1, 8):
+                            if r in a.known_exit_gates:
+                                target = a.known_exit_gates[r]
+                                break
                 else:
                     target = env.exit_gates[7]
 
@@ -278,7 +285,7 @@ class LoneEntryStrategy(BaseStrategy):
                 a.has_reached_center = True
                 a.highest_ring_breached = 7
 
-            if a.has_reached_center and (current_ring > config.num_rings or a.target_exit_ring > 7):
+            if a.has_reached_center and (a.pos == env.exit_gates[7] or current_ring > config.num_rings or a.target_exit_ring > 7):
                 a.has_exited = True
 
         return 0
@@ -356,11 +363,18 @@ class BlindFollowStrategy(BaseStrategy):
                     else:
                         target = env.center
                 else:
-                    if a.target_exit_ring in a.known_exit_gates:
-                        target = a.known_exit_gates[a.target_exit_ring]
-                        if a.pos == target:
-                            a.target_exit_ring += 1
-                            target = a.known_exit_gates.get(a.target_exit_ring, env.exit_gates[7])
+                    if a.target_exit_ring <= 7:
+                        if a.target_exit_ring in a.known_exit_gates:
+                            target = a.known_exit_gates[a.target_exit_ring]
+                            if a.pos == target:
+                                a.target_exit_ring += 1
+                                target = a.known_exit_gates.get(a.target_exit_ring, env.exit_gates[7]) if a.target_exit_ring <= 7 else env.exit_gates[7]
+                        else:
+                            target = env.exit_gates[7]
+                            for r in range(a.target_exit_ring + 1, 8):
+                                if r in a.known_exit_gates:
+                                    target = a.known_exit_gates[r]
+                                    break
                     else:
                         target = env.exit_gates[7]
                 next_pos = bfs_next_step(a.pos, target, env, occupied)
@@ -382,7 +396,7 @@ class BlindFollowStrategy(BaseStrategy):
                 a.has_reached_center = True
                 a.highest_ring_breached = 7
 
-            if a.has_reached_center and (current_ring > config.num_rings or a.target_exit_ring > 7):
+            if a.has_reached_center and (a.pos == env.exit_gates[7] or current_ring > config.num_rings or a.target_exit_ring > 7):
                 a.has_exited = True
 
         return 0
@@ -470,19 +484,29 @@ class SharedMapStrategy(BaseStrategy):
                 a.target_exit_ring = 1
 
             if not a.has_reached_center:
-                if a.target_entry_ring in a.known_entry_gates:
-                    target = a.known_entry_gates[a.target_entry_ring]
-                    if a.pos == target:
-                        a.target_entry_ring -= 1
-                        target = a.known_entry_gates.get(a.target_entry_ring, env.center)
+                if a.target_entry_ring > 0:
+                    if a.target_entry_ring in a.known_entry_gates:
+                        target = a.known_entry_gates[a.target_entry_ring]
+                        if a.pos == target:
+                            a.target_entry_ring -= 1
+                            target = a.known_entry_gates.get(a.target_entry_ring, env.center) if a.target_entry_ring > 0 else env.center
+                    else:
+                        target = a.known_entry_gates.get(7, env.entry_gates[7])
                 else:
-                    target = a.known_entry_gates.get(7, env.entry_gates[7])
+                    target = env.center
             else:
-                if a.target_exit_ring in a.known_exit_gates:
-                    target = a.known_exit_gates[a.target_exit_ring]
-                    if a.pos == target:
-                        a.target_exit_ring += 1
-                        target = a.known_exit_gates.get(a.target_exit_ring, env.exit_gates[7])
+                if a.target_exit_ring <= 7:
+                    if a.target_exit_ring in a.known_exit_gates:
+                        target = a.known_exit_gates[a.target_exit_ring]
+                        if a.pos == target:
+                            a.target_exit_ring += 1
+                            target = a.known_exit_gates.get(a.target_exit_ring, env.exit_gates[7]) if a.target_exit_ring <= 7 else env.exit_gates[7]
+                    else:
+                        target = env.exit_gates[7]
+                        for r in range(a.target_exit_ring + 1, 8):
+                            if r in a.known_exit_gates:
+                                target = a.known_exit_gates[r]
+                                break
                 else:
                     target = env.exit_gates[7]
 
@@ -501,7 +525,7 @@ class SharedMapStrategy(BaseStrategy):
                 a.has_reached_center = True
                 a.highest_ring_breached = 7
 
-            if a.has_reached_center and (current_ring > config.num_rings or a.target_exit_ring > 7):
+            if a.has_reached_center and (a.pos == env.exit_gates[7] or current_ring > config.num_rings or a.target_exit_ring > 7):
                 a.has_exited = True
 
         return messages_sent
@@ -615,19 +639,29 @@ class SplitExitStrategy(BaseStrategy):
                         break
             else:
                 if not a.has_reached_center:
-                    if a.target_entry_ring in a.known_entry_gates:
-                        target = a.known_entry_gates[a.target_entry_ring]
-                        if a.pos == target:
-                            a.target_entry_ring -= 1
-                            target = a.known_entry_gates.get(a.target_entry_ring, env.center)
+                    if a.target_entry_ring > 0:
+                        if a.target_entry_ring in a.known_entry_gates:
+                            target = a.known_entry_gates[a.target_entry_ring]
+                            if a.pos == target:
+                                a.target_entry_ring -= 1
+                                target = a.known_entry_gates.get(a.target_entry_ring, env.center) if a.target_entry_ring > 0 else env.center
+                        else:
+                            target = a.known_entry_gates.get(7, env.entry_gates[7])
                     else:
                         target = env.center
                 else:
-                    if a.target_exit_ring in a.known_exit_gates:
-                        target = a.known_exit_gates[a.target_exit_ring]
-                        if a.pos == target:
-                            a.target_exit_ring += 1
-                            target = a.known_exit_gates.get(a.target_exit_ring, env.exit_gates[7])
+                    if a.target_exit_ring <= 7:
+                        if a.target_exit_ring in a.known_exit_gates:
+                            target = a.known_exit_gates[a.target_exit_ring]
+                            if a.pos == target:
+                                a.target_exit_ring += 1
+                                target = a.known_exit_gates.get(a.target_exit_ring, env.exit_gates[7]) if a.target_exit_ring <= 7 else env.exit_gates[7]
+                        else:
+                            target = env.exit_gates[7]
+                            for r in range(a.target_exit_ring + 1, 8):
+                                if r in a.known_exit_gates:
+                                    target = a.known_exit_gates[r]
+                                    break
                     else:
                         target = env.exit_gates[7]
 
@@ -646,7 +680,7 @@ class SplitExitStrategy(BaseStrategy):
                 a.has_reached_center = True
                 a.highest_ring_breached = 7
 
-            if a.has_reached_center and (current_ring > config.num_rings or a.target_exit_ring > 7):
+            if a.has_reached_center and (a.pos == env.exit_gates[7] or current_ring > config.num_rings or a.target_exit_ring > 7):
                 a.has_exited = True
 
         return messages_sent
