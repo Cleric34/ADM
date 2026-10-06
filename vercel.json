@@ -1,6 +1,5 @@
 {
-  "cleanUrls": true,
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/api/index.py" }
-  ]
+  "buildCommand": "python -c \"import shutil, os; os.makedirs('dist', exist_ok=True); shutil.copy('index.html', 'dist/index.html'); shutil.copytree('game', 'dist/game', dirs_exist_ok=True)\"",
+  "outputDirectory": "dist",
+  "cleanUrls": true
 }
