@@ -1,0 +1,1582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Chakravyuha: The 13th Day — Kurukshetra 3D Battle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Yatra+One&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+
+<style>
+:root {
+  --gold: #f59e0b;
+  --gold-glow: #fde047;
+  --saffron: #ea580c;
+  --sand-bg: #1c150e;
+  --sand-light: #e5cdab;
+  --sand-border: rgba(217, 119, 6, 0.45);
+  --panel-bg: rgba(28, 21, 14, 0.88);
+  --cyan: #06b6d4;
+  --green: #22c55e;
+  --red: #ef4444;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+body {
+  background-color: var(--sand-bg);
+  color: #fdf6ec;
+  font-family: 'Outfit', sans-serif;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  position: relative;
+}
+h1, h2, h3, .royal-font { font-family: 'Yatra One', 'Cinzel', serif; letter-spacing: 0.5px; }
+
+#canvas-container {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  z-index: 1;
+}
+
+/* UI Overlay Layer */
+#ui-layer {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  z-index: 10;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 10px 14px;
+}
+.interactive { pointer-events: auto; }
+
+/* Top Header */
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--panel-bg);
+  border: 1px solid var(--sand-border);
+  border-radius: 10px;
+  padding: 8px 14px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 25px rgba(0,0,0,0.7), inset 0 0 15px rgba(245,158,11,0.08);
+}
+.title-box h1 {
+  font-size: 1.2rem;
+  background: linear-gradient(135deg, #fef08a, #f59e0b, #d97706);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 20px rgba(245,158,11,0.4);
+}
+.title-box p { font-size: 0.68rem; color: #d4b896; font-weight: 600; }
+
+.header-actions { display: flex; gap: 6px; align-items: center; }
+button.btn {
+  background: linear-gradient(135deg, #332317, #1f140d);
+  color: var(--gold-glow);
+  border: 1px solid var(--sand-border);
+  padding: 5px 11px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.76rem;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex; align-items: center; gap: 4px;
+}
+button.btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #f59e0b, #b45309);
+  color: #0d0906;
+  box-shadow: 0 0 16px rgba(245,158,11,0.6);
+  transform: translateY(-1px);
+}
+button.btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* Gate Status & Alignment Alerts */
+#align-banner {
+  position: absolute;
+  top: 60px; left: 50%; transform: translateX(-50%);
+  background: linear-gradient(135deg, rgba(220,38,38,0.95), rgba(153,27,27,0.95));
+  border: 1px solid #fca5a5;
+  color: #fff;
+  padding: 5px 18px;
+  border-radius: 25px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  opacity: 0;
+  transition: opacity 0.25s, transform 0.25s;
+  pointer-events: none;
+  box-shadow: 0 0 20px rgba(239,68,68,0.7);
+}
+#align-banner.show { opacity: 1; transform: translateX(-50%) translateY(5px); }
+
+#gate-prompt-hud {
+  position: absolute;
+  top: 98px; left: 50%; transform: translateX(-50%);
+  background: linear-gradient(135deg, rgba(16,185,129,0.95), rgba(5,150,105,0.95));
+  border: 1px solid #a7f3d0;
+  color: #fff;
+  padding: 5px 18px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  display: none;
+  box-shadow: 0 0 20px rgba(16,185,129,0.6);
+  animation: pulsePrompt 1s infinite alternate;
+}
+@keyframes pulsePrompt {
+  0% { transform: translateX(-50%) scale(0.96); }
+  100% { transform: translateX(-50%) scale(1.04); }
+}
+
+/* Middle Layout - Compact HUD to keep center formation wide open */
+#middle-hud {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  width: 100%;
+  margin-top: 6px;
+  flex: 1;
+}
+
+/* Left Hero & Allies Card */
+.hero-card {
+  width: 225px;
+  background: var(--panel-bg);
+  border: 1px solid var(--sand-border);
+  border-radius: 10px;
+  padding: 10px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.6);
+}
+.hero-header { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+.hero-avatar {
+  width: 38px; height: 38px; border-radius: 8px;
+  background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+  border: 2px solid var(--gold);
+  display: flex; align-items: center; justify-content: center; font-size: 1.25rem;
+  box-shadow: 0 0 12px rgba(59,130,246,0.6);
+}
+.bar-container { width: 100%; height: 8px; background: #2b1d14; border-radius: 4px; overflow: hidden; margin-top: 4px; border: 1px solid rgba(255,255,255,0.15); }
+.bar-fill { height: 100%; background: linear-gradient(90deg, #dc2626, #eab308, #22c55e); transition: width 0.3s; }
+
+.hud-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 0.72rem; margin-top: 6px; }
+.hud-item { background: rgba(0,0,0,0.45); padding: 4px 6px; border-radius: 5px; border-left: 3px solid var(--gold); }
+.hud-label { color: #d4b896; font-size: 0.62rem; display: block; font-weight: 600; }
+.hud-val { font-weight: 800; color: #fff; font-size: 0.8rem; }
+
+/* Follower Roster */
+.ally-roster { margin-top: 6px; padding-top: 5px; border-top: 1px solid rgba(255,255,255,0.1); font-size: 0.7rem; }
+.ally-badges { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
+.ally-tag { background: rgba(34,197,94,0.2); border: 1px solid #22c55e; color: #4ade80; padding: 2px 5px; border-radius: 4px; font-weight: 700; font-size: 0.62rem; }
+
+/* Right Dispatches Log */
+.dispatches-card {
+  width: 235px;
+  background: var(--panel-bg);
+  border: 1px solid var(--sand-border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.6);
+}
+#event-log {
+  height: 125px;
+  overflow-y: auto;
+  font-family: monospace;
+  font-size: 0.7rem;
+  background: rgba(0,0,0,0.5);
+  padding: 5px 6px;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 3px;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.log-line { line-height: 1.25; }
+.log-info { color: #38bdf8; } .log-warn { color: #fbbf24; } .log-danger { color: #f87171; } .log-success { color: #4ade80; }
+
+/* Bottom HUD: Call Ally & D-Pad */
+#bottom-hud {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  width: 100%;
+}
+.controls-card {
+  background: var(--panel-bg);
+  border: 1px solid var(--sand-border);
+  border-radius: 10px;
+  padding: 8px;
+  backdrop-filter: blur(12px);
+}
+#dpad { display: grid; grid-template-columns: repeat(3, 44px); gap: 4px; }
+.dpad-btn {
+  background: #2b1d14; border: 1px solid var(--sand-border); color: var(--gold-glow);
+  font-size: 0.9rem; font-weight: 800; padding: 9px 0; border-radius: 7px; cursor: pointer; transition: 0.1s; text-align: center;
+}
+.dpad-btn:active { background: var(--gold); color: #000; transform: scale(0.92); }
+
+/* Overlays */
+.overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(18, 12, 8, 0.94);
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  padding: 16px; text-align: center; z-index: 100;
+  backdrop-filter: blur(12px);
+}
+.overlay.hidden { display: none !important; }
+.modal-box {
+  max-width: 500px; width: 100%;
+  background: #24180f; border: 2px solid var(--gold); border-radius: 14px;
+  padding: 22px; box-shadow: 0 0 50px rgba(245,158,11,0.35), inset 0 0 20px rgba(245,158,11,0.06);
+  max-height: 92vh; overflow-y: auto;
+}
+.modal-box h2 { font-size: 1.6rem; color: var(--gold-glow); margin-bottom: 6px; }
+.modal-box p { font-size: 0.83rem; color: #eeddc9; line-height: 1.5; margin-bottom: 12px; }
+
+.council-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0; text-align: left; }
+.council-card {
+  background: #332317; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px;
+  padding: 9px 11px; cursor: pointer; transition: 0.2s;
+}
+.council-card:hover { border-color: var(--gold); }
+.council-card.selected {
+  border-color: var(--gold); background: rgba(245, 158, 11, 0.25); box-shadow: 0 0 14px rgba(245,158,11,0.35);
+}
+.council-title { font-size: 0.8rem; font-weight: 800; color: var(--gold); display: block; }
+.council-desc { font-size: 0.68rem; color: #d4b896; }
+
+.stat-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 0.82rem; }
+
+/* Camera Shake */
+.shake { animation: shakeAnim 0.35s cubic-bezier(.36,.07,.19,.97) both; }
+@keyframes shakeAnim {
+  10%, 90% { transform: translate3d(-3px, 0, 0); }
+  20%, 80% { transform: translate3d(4px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-5px, 0, 0); }
+  40%, 60% { transform: translate3d(5px, 0, 0); }
+}
+
+@media (max-width: 768px) {
+  .hero-card { width: 165px; padding: 6px; }
+  .dispatches-card { width: 175px; }
+  #event-log { height: 90px; }
+}
+</style>
+</head>
+<body>
+
+<div id="canvas-container"></div>
+
+<div id="ui-layer">
+  <!-- Top Bar -->
+  <header class="interactive">
+    <div class="title-box">
+      <h1>🛡️ CHAKRAVYUHA: THE 13TH DAY</h1>
+      <p>Kurukshetra Sand Plains — Continuous Dynamic Disc Rotation</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn" id="btn-zoom-in" title="Zoom In">🔍 +</button>
+      <button class="btn" id="btn-zoom-out" title="Zoom Out">🔍 −</button>
+      <button class="btn" id="btn-speed">⚡ Speed: 1x</button>
+      <button class="btn" id="btn-pause">⏸️ Pause</button>
+      <button class="btn" id="btn-view">📐 View: 3D</button>
+      <button class="btn" id="btn-sound">🔊 Mute</button>
+      <button class="btn" id="btn-help">📜 Intel</button>
+      <button class="btn" id="btn-menu">⚙️ Council</button>
+    </div>
+  </header>
+
+  <!-- Alignment Warning & Ready Prompts -->
+  <div id="align-banner">⛔ GATE NOT ALIGNED! TIMING WINDOW MISSED</div>
+  <div id="gate-prompt-hud">✨ GATE ALIGNED! PRESS IN/OUT TO CROSS</div>
+
+  <!-- Middle HUD -->
+  <div id="middle-hud">
+    <!-- Hero Card -->
+    <div class="hero-card interactive">
+      <div class="hero-header">
+        <div class="hero-avatar">🏹</div>
+        <div>
+          <span style="font-weight:800; color:var(--gold); font-size:0.9rem;">Abhimanyu</span>
+          <span id="txt-hp" style="font-size:0.75rem; display:block; color:#f8fafc;">100 / 100 HP</span>
+        </div>
+      </div>
+      <div class="bar-container"><div id="bar-hp" class="bar-fill" style="width:100%;"></div></div>
+      <div class="hud-grid">
+        <div class="hud-item"><span class="hud-label">Ring Level</span><span class="hud-val" id="txt-ring">Outside (R8)</span></div>
+        <div class="hud-item"><span class="hud-label">Time to Sunset</span><span class="hud-val" id="txt-time">02:00</span></div>
+        <div class="hud-item"><span class="hud-label">Valor 🪷</span><span class="hud-val" id="txt-valor" style="color:var(--cyan);">0 / 3</span></div>
+        <div class="hud-item"><span class="hud-label">Sanctum</span><span class="hud-val" id="txt-core" style="color:var(--red);">Unbreached</span></div>
+      </div>
+      <div class="ally-roster">
+        <span class="hud-label">Pandava Strike Force:</span>
+        <div class="ally-badges">
+          <span class="ally-tag">Bhima (Mace)</span>
+          <span class="ally-tag">Yudhi (Sword)</span>
+          <span class="ally-tag">Nakula</span>
+          <span class="ally-tag">Sahadeva</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dispatches Log -->
+    <div class="dispatches-card interactive">
+      <span class="hud-label" style="margin-bottom:3px; font-weight:800; color:var(--gold);">⚔️ Battlefield Chronicle:</span>
+      <div id="event-log"></div>
+    </div>
+  </div>
+
+  <!-- Bottom HUD -->
+  <div id="bottom-hud">
+    <div class="controls-card interactive">
+      <button class="btn" id="btn-ally" style="padding:8px 12px; font-size:0.82rem; font-weight:800; background:linear-gradient(135deg,#1e3a8a,#2563eb); color:#fff; border-color:#60a5fa;">
+        🛡️ Call Ally: Hold Gate (<span id="txt-ally-count">2</span> left)
+      </button>
+    </div>
+
+    <div class="controls-card interactive">
+      <div id="dpad">
+        <div></div><button class="dpad-btn" id="btn-up" title="Move Inward (Up / W)">⬆️ In</button><div></div>
+        <button class="dpad-btn" id="btn-left" title="Step Counter-Clockwise (Left / A)">↺ CCW</button>
+        <button class="dpad-btn" id="btn-down" title="Move Outward (Down / S)">⬇️ Out</button>
+        <button class="dpad-btn" id="btn-right" title="Step Clockwise (Right / D)">↻ CW</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Start Modal -->
+<div id="overlay-start" class="overlay">
+  <div class="modal-box">
+    <h2>CHAKRAVYUHA: THE 13TH DAY</h2>
+    <p>On the sun-baked sand plains of Kurukshetra, Acharya Drona has deployed the spinning 7-disc military labyrinth. Young <b>Abhimanyu</b> and 4 Pandava warriors advance to break the formation.</p>
+    
+    <div style="display:flex; justify-content:center; gap:8px; margin:12px 0;">
+      <span style="background:rgba(245,158,11,0.25); border:1px solid var(--gold); padding:4px 8px; border-radius:4px; font-size:0.75rem;">7 Sandstone Rings</span>
+      <span style="background:rgba(234,88,12,0.25); border:1px solid var(--saffron); padding:4px 8px; border-radius:4px; font-size:0.75rem;">Continuous Rotation</span>
+      <span style="background:rgba(6,182,212,0.25); border:1px solid var(--cyan); padding:4px 8px; border-radius:4px; font-size:0.75rem;">Fog of War Exits</span>
+    </div>
+
+    <button class="btn" id="btn-start-council" style="width:100%; padding:12px; font-size:1rem; background:var(--gold); color:#000; font-weight:900; margin-top:8px;">
+      Enter War Council ⚔️
+    </button>
+  </div>
+</div>
+
+<!-- War Council Setup Modal -->
+<div id="overlay-council" class="overlay hidden">
+  <div class="modal-box">
+    <h2>WAR COUNCIL SETUP</h2>
+    <p>Configure tactical parameters for the battle of Day 13:</p>
+
+    <div class="council-grid">
+      <div class="council-card selected" data-type="diff" data-val="low">
+        <span class="council-title">Difficulty: Low</span>
+        <span class="council-desc">1 guard/ring, abundant lotuses</span>
+      </div>
+      <div class="council-card" data-type="diff" data-val="medium">
+        <span class="council-title">Difficulty: Med</span>
+        <span class="council-desc">2 guards/ring, balanced patrol</span>
+      </div>
+      <div class="council-card" data-type="diff" data-val="high">
+        <span class="council-title">Difficulty: High</span>
+        <span class="council-desc">3 lethal Kaurava Maharathis/ring</span>
+      </div>
+      <div class="council-card selected" data-type="speed" data-val="1.0">
+        <span class="council-title">Rotation: Normal</span>
+        <span class="council-desc">Standard 1x disc speed</span>
+      </div>
+    </div>
+
+    <button class="btn" id="btn-enter-battle" style="width:100%; padding:12px; font-size:1rem; background:var(--gold); color:#000; font-weight:900;">
+      Enter the Chakravyuha 🏹
+    </button>
+  </div>
+</div>
+
+<!-- Intel Modal -->
+<div id="overlay-help" class="overlay hidden">
+  <div class="modal-box">
+    <h2>📜 COMMANDER'S INTEL</h2>
+    <ol style="text-align:left; font-size:0.8rem; line-height:1.6; padding-left:18px;">
+      <li><b>Sandstone Fortress Walls:</b> 7 concentric stone ramparts spin constantly in alternating directions.</li>
+      <li><b>Gate Crossings:</b> Golden Toranas are IN entrances; Radiant Cyan portals are OUT exits. Crossings work when your angle aligns with the gateway opening. Aligned gates emit vertical beacon shafts!</li>
+      <li><b>Defined Attackers:</b> Abhimanyu (Blue & Gold Prince-Archer) and 4 Pandava warriors (Bhima with Mace, Yudhishthira with Sword, Nakula & Sahadeva) stand directly on the ring tracks.</li>
+      <li><b>Combat & Valor:</b> Red Kaurava guards patrol each layer. Collect glowing pink-gold Sacred Lotuses (🪷) for Valor charges to vanquish guards safely.</li>
+      <li><b>Jayadratha Lockdown:</b> Outer gate seals shut upon entering the Core. Escape via hidden portals discovered in the fog!</li>
+    </ol>
+    <button class="btn" id="btn-close-help" style="width:100%; padding:8px; margin-top:12px;">Dismiss Intel</button>
+  </div>
+</div>
+
+<!-- Victory / Defeat Modal -->
+<div id="overlay-gameover" class="overlay hidden">
+  <div class="modal-box">
+    <h2 id="end-title">VICTORY</h2>
+    <p id="end-desc">Abhimanyu achieved the impossible.</p>
+    
+    <div id="end-rank" style="font-size:1.15rem; font-weight:800; color:var(--gold-glow); margin-bottom:8px;"></div>
+    <div id="end-stats" style="margin-bottom:12px;"></div>
+
+    <div style="display:flex; gap:8px;">
+      <button class="btn" id="btn-playagain" style="flex:1; padding:10px; background:var(--gold); color:#000; font-weight:800;">Play Again 🔄</button>
+      <button class="btn" id="btn-rematch" style="flex:1; padding:10px;">Change Setup ⚙️</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== GAME JAVASCRIPT ==================== -->
+<script type="module">
+import * as THREE from 'three';
+
+// --- CONFIGURATION ---
+const NUM_RINGS = 7;
+const RING_SPACING = 4.2;
+const CORE_RADIUS = 3.6;
+const GATE_TOLERANCE = 0.45; // Angular tolerance in radians (~26 degrees)
+
+const RING_SPEEDS = {
+  1: 0.18,  // Innermost ring
+  2: -0.14,
+  3: 0.12,
+  4: -0.09,
+  5: 0.07,
+  6: -0.05,
+  7: 0.035  // Outermost ring
+};
+
+// --- SOUND EFFECTS ---
+class SoundFX {
+  constructor() { this.ctx = null; this.muted = false; }
+  init() { if (!this.ctx) { const AC = window.AudioContext || window.webkitAudioContext; this.ctx = new AC(); } }
+  play(t) {
+    if (this.muted || !this.ctx) return;
+    try {
+      const c = this.ctx, o = c.createOscillator(), g = c.createGain(), now = c.currentTime;
+      o.connect(g); g.connect(c.destination);
+      if (t === 'step') {
+        o.frequency.setValueAtTime(160, now); o.frequency.exponentialRampToValueAtTime(70, now + 0.05);
+        g.gain.setValueAtTime(0.08, now); g.gain.linearRampToValueAtTime(0, now + 0.05);
+        o.start(now); o.stop(now + 0.05);
+      } else if (t === 'gate') {
+        o.frequency.setValueAtTime(320, now); o.frequency.exponentialRampToValueAtTime(680, now + 0.18);
+        g.gain.setValueAtTime(0.18, now); g.gain.linearRampToValueAtTime(0, now + 0.18);
+        o.start(now); o.stop(now + 0.18);
+      } else if (t === 'combat') {
+        o.type = 'sawtooth'; o.frequency.setValueAtTime(130, now); o.frequency.exponentialRampToValueAtTime(40, now + 0.2);
+        g.gain.setValueAtTime(0.25, now); g.gain.linearRampToValueAtTime(0, now + 0.2);
+        o.start(now); o.stop(now + 0.2);
+      } else if (t === 'lotus') {
+        o.type = 'sine'; o.frequency.setValueAtTime(440, now); o.frequency.setValueAtTime(660, now + 0.1);
+        g.gain.setValueAtTime(0.18, now); g.gain.linearRampToValueAtTime(0, now + 0.25);
+        o.start(now); o.stop(now + 0.25);
+      } else if (t === 'lock') {
+        o.type = 'square'; o.frequency.setValueAtTime(90, now); o.frequency.exponentialRampToValueAtTime(30, now + 0.4);
+        g.gain.setValueAtTime(0.3, now); g.gain.linearRampToValueAtTime(0, now + 0.4);
+        o.start(now); o.stop(now + 0.4);
+      } else if (t === 'win') {
+        [523, 659, 784, 1046].forEach((f, i) => {
+          const osc = c.createOscillator(), gn = c.createGain();
+          osc.connect(gn); gn.connect(c.destination); osc.frequency.setValueAtTime(f, now + i * 0.08);
+          gn.gain.setValueAtTime(0.15, now + i * 0.08); gn.gain.linearRampToValueAtTime(0, now + i * 0.08 + 0.25);
+          osc.start(now + i * 0.08); osc.stop(now + i * 0.08 + 0.25);
+        });
+      }
+    } catch(e) {}
+  }
+}
+const sfx = new SoundFX();
+
+// --- GAME LOGIC STATE ---
+class GameState {
+  constructor() {
+    this.difficulty = 'medium';
+    this.speedMultiplier = 1.0;
+    this.paused = false;
+    this.viewMode = '3d';
+    
+    this.maxHealth = 100;
+    this.health = 100;
+    this.valor = 0;
+    this.turns = 0;
+    this.guardsDefeated = 0;
+    this.gatesPassed = 0;
+    this.timeLeft = 120.0;
+    
+    // Abhimanyu and 4 Follower Pandavas
+    this.player = { ring: 8, angle: 0 };
+    this.followers = [
+      { id: 'bhima', name: 'Bhima', weapon: 'mace', ring: 8, offsetAngle: -0.15, alive: true },
+      { id: 'yudhi', name: 'Yudhishthira', weapon: 'sword', ring: 8, offsetAngle: -0.30, alive: true },
+      { id: 'nakula', name: 'Nakula', weapon: 'twin_swords', ring: 8, offsetAngle: -0.45, alive: true },
+      { id: 'sahadeva', name: 'Sahadeva', weapon: 'spear', ring: 8, offsetAngle: -0.60, alive: true },
+    ];
+
+    this.reachedCore = false;
+    this.jayadrathaSealed = false;
+    this.allyCharges = 2;
+    this.allyHeldRing = null;
+    this.allyHeldTimer = 0;
+    
+    this.gameOver = false;
+    this.won = false;
+    
+    this.ringAngles = {};
+    for (let r = 1; r <= NUM_RINGS; r++) this.ringAngles[r] = 0;
+    
+    this.entryGateRelAngles = {};
+    this.exitGateRelAngles = {};
+    for (let r = 1; r <= NUM_RINGS; r++) {
+      this.entryGateRelAngles[r] = (r * 0.9) % (Math.PI * 2);
+      this.exitGateRelAngles[r] = (this.entryGateRelAngles[r] + Math.PI * 0.95) % (Math.PI * 2);
+    }
+    
+    this.guards = [];
+    this.lotuses = [];
+    this.initEntities();
+  }
+
+  initEntities() {
+    this.guards = [];
+    const count = this.difficulty === 'low' ? 1 : (this.difficulty === 'medium' ? 2 : 3);
+    for (let r = 1; r <= NUM_RINGS; r++) {
+      const str = (8 - r) * (this.difficulty === 'high' ? 14 : 9);
+      for (let i = 0; i < count; i++) {
+        this.guards.push({
+          ring: r,
+          relAngle: (this.entryGateRelAngles[r] + 1.2 + i * 2.2) % (Math.PI * 2),
+          strength: str,
+          alive: true
+        });
+      }
+    }
+    this.lotuses = [
+      { ring: 2, relAngle: 1.0, active: true },
+      { ring: 4, relAngle: 3.2, active: true },
+      { ring: 6, relAngle: 4.8, active: true }
+    ];
+  }
+
+  getRingRadius(r) {
+    if (r === 0) return 0;
+    return CORE_RADIUS + (r - 1) * RING_SPACING + 2.1;
+  }
+
+  getGateWorldAngle(ring, isExit = false) {
+    const rel = isExit ? this.exitGateRelAngles[ring] : this.entryGateRelAngles[ring];
+    return (this.ringAngles[ring] + rel) % (Math.PI * 2);
+  }
+
+  diffAngle(a1, a2) {
+    let diff = Math.abs(a1 - a2) % (Math.PI * 2);
+    return diff > Math.PI ? (Math.PI * 2 - diff) : diff;
+  }
+
+  hasVision(ring, angle) {
+    if (this.player.ring === 0) return ring <= 2;
+    if (Math.abs(this.player.ring - ring) <= 1) {
+      return this.diffAngle(this.player.angle, angle) < 1.0;
+    }
+    return false;
+  }
+
+  checkAlignment(targetRing, isExitPhase) {
+    if (this.allyHeldRing === targetRing) return true;
+    const gateAngle = this.getGateWorldAngle(targetRing, isExitPhase);
+    return this.diffAngle(this.player.angle, gateAngle) < GATE_TOLERANCE;
+  }
+
+  update(dt) {
+    if (this.paused || this.gameOver) return;
+
+    this.timeLeft -= dt;
+    if (this.timeLeft <= 0) {
+      this.timeLeft = 0;
+      this.gameOver = true;
+      this.won = false;
+      showEndScreen(false, "Sunset on Kurukshetra. The 13th day has ended.");
+    }
+
+    // Continuous rotation of rings
+    for (let r = 1; r <= NUM_RINGS; r++) {
+      const speed = RING_SPEEDS[r] * this.speedMultiplier;
+      this.ringAngles[r] = (this.ringAngles[r] + speed * dt) % (Math.PI * 2);
+    }
+
+    // Abhimanyu rides his current ring
+    if (this.player.ring >= 1 && this.player.ring <= 7) {
+      const speed = RING_SPEEDS[this.player.ring] * this.speedMultiplier;
+      this.player.angle = (this.player.angle + speed * dt) % (Math.PI * 2);
+    }
+
+    // Followers trail Abhimanyu or lock outside at Ring 8
+    this.followers.forEach((f) => {
+      if (!this.jayadrathaSealed) {
+        f.ring = this.player.ring;
+        f.angle = (this.player.angle + f.offsetAngle + Math.PI * 2) % (Math.PI * 2);
+      } else {
+        f.ring = 8;
+      }
+    });
+
+    // Ally timer
+    if (this.allyHeldRing !== null) {
+      this.allyHeldTimer -= dt;
+      if (this.allyHeldTimer <= 0) {
+        logDispatch(`🛡️ Pandava ally withdrew from Ring ${this.allyHeldRing} breach.`, 'log-info');
+        this.allyHeldRing = null;
+      }
+    }
+
+    // Guard encounters
+    this.guards.forEach(g => {
+      if (!g.alive || g.ring !== this.player.ring) return;
+      const gWorldAngle = (this.ringAngles[g.ring] + g.relAngle) % (Math.PI * 2);
+      if (this.diffAngle(this.player.angle, gWorldAngle) < 0.25) {
+        this.resolveCombat(g);
+      }
+    });
+
+    // Sacred Lotus pickups
+    this.lotuses.forEach(l => {
+      if (!l.active || l.ring !== this.player.ring) return;
+      const lWorldAngle = (this.ringAngles[l.ring] + l.relAngle) % (Math.PI * 2);
+      if (this.diffAngle(this.player.angle, lWorldAngle) < 0.30) {
+        l.active = false;
+        this.valor = Math.min(3, this.valor + 1);
+        this.health = Math.min(this.maxHealth, this.health + 25);
+        sfx.play('lotus');
+        logDispatch(`🪷 Sacred Lotus: +1 Valor (${this.valor}/3), +25 HP!`, 'log-success');
+      }
+    });
+  }
+
+  resolveCombat(g) {
+    sfx.play('combat');
+    triggerDamageShake();
+    if (this.valor > 0) {
+      this.valor--;
+      const dmg = Math.floor(g.strength * 0.35);
+      this.health -= dmg;
+      g.alive = false;
+      this.guardsDefeated++;
+      logDispatch(`⚔️ Divine Valor spent! Guard vanquished, took ${dmg} dmg.`, 'log-warn');
+    } else {
+      this.health -= g.strength;
+      g.alive = false;
+      this.guardsDefeated++;
+      logDispatch(`💥 Heavy Clash: Kaurava guard dealt ${g.strength} dmg!`, 'log-danger');
+    }
+    if (this.health <= 0) {
+      this.health = 0;
+      this.gameOver = true;
+      this.won = false;
+      showEndScreen(false, "Abhimanyu has fallen in battle defending Dharma.");
+    }
+    updateHUD();
+  }
+
+  movePlayer(dir) {
+    if (this.gameOver) return;
+    sfx.init();
+    this.turns++;
+
+    if (dir === 'left') {
+      this.player.angle = (this.player.angle - 0.22 + Math.PI * 2) % (Math.PI * 2);
+      sfx.play('step');
+    } else if (dir === 'right') {
+      this.player.angle = (this.player.angle + 0.22) % (Math.PI * 2);
+      sfx.play('step');
+    } else if (dir === 'in') {
+      if (this.player.ring === 8) {
+        // Breaching into Ring 7
+        if (this.checkAlignment(7, false)) {
+          this.player.ring = 7;
+          this.gatesPassed++;
+          sfx.play('gate');
+          logDispatch(`🏹 Breached outer Ring 7 Torana!`, 'log-success');
+          this.triggerJayadrathaLock();
+        } else {
+          showAlignmentAlert();
+        }
+      } else if (this.player.ring > 1) {
+        const nextRing = this.player.ring - 1;
+        const canCross = this.checkAlignment(nextRing, false) || (this.reachedCore && this.checkAlignment(nextRing, true));
+        if (canCross) {
+          this.player.ring = nextRing;
+          this.gatesPassed++;
+          sfx.play('gate');
+          logDispatch(`🏹 Breached inward to Ring ${nextRing}!`, 'log-success');
+        } else {
+          showAlignmentAlert();
+        }
+      } else if (this.player.ring === 1) {
+        this.player.ring = 0;
+        this.reachedCore = true;
+        this.gatesPassed++;
+        sfx.play('lotus');
+        logDispatch(`🌟 Sanctum Core Reached! The secret of entry is conquered. Now find the Exit!`, 'log-success');
+      }
+    } else if (dir === 'out') {
+      if (this.player.ring === 0) {
+        this.player.ring = 1;
+        this.gatesPassed++;
+        sfx.play('gate');
+        logDispatch(`🚪 Commencing breakout through Ring 1!`, 'log-info');
+      } else if (this.player.ring < 7) {
+        const curRing = this.player.ring;
+        const canCross = this.checkAlignment(curRing, true) || (!this.reachedCore && this.checkAlignment(curRing, false));
+        if (canCross) {
+          this.player.ring++;
+          this.gatesPassed++;
+          sfx.play('gate');
+          logDispatch(`🚪 Egressed outward to Ring ${this.player.ring}!`, 'log-info');
+        } else {
+          showAlignmentAlert();
+        }
+      } else if (this.player.ring === 7) {
+        if (this.checkAlignment(7, true)) {
+          this.player.ring = 8;
+          this.gatesPassed++;
+          this.won = true;
+          this.gameOver = true;
+          sfx.play('win');
+          logDispatch(`🏆 IMMORTAL VICTORY: Abhimanyu escaped the Chakravyuha!`, 'log-success');
+          showEndScreen(true);
+        } else {
+          showAlignmentAlert();
+        }
+      }
+    }
+    updateHUD();
+  }
+
+  triggerJayadrathaLock() {
+    if (!this.jayadrathaSealed) {
+      this.jayadrathaSealed = true;
+      sfx.play('lock');
+      triggerDamageShake();
+      logDispatch(`⚔️ JAYADRATHA SLAMS REAR GATE! The Pandava followers are trapped outside!`, 'log-danger');
+    }
+  }
+
+  callAlly() {
+    if (this.allyCharges <= 0 || this.gameOver || this.player.ring === 0 || this.player.ring === 8) return;
+    this.allyCharges--;
+    this.allyHeldRing = this.player.ring;
+    this.allyHeldTimer = 6.0;
+    sfx.play('lotus');
+    logDispatch(`🛡️ Pandava Ally holds Ring ${this.player.ring} gateway open for 6s!`, 'log-success');
+    updateHUD();
+  }
+}
+
+let game = new GameState();
+
+// --- THREE.JS KURUKSHETRA SANDISH-BROWN SCENE ---
+const container = document.getElementById('canvas-container');
+const scene = new THREE.Scene();
+// Authentic Sandish-Brown Kurukshetra Desert Plains Palette
+scene.background = new THREE.Color(0x3d2c1e);
+scene.fog = new THREE.FogExp2(0x3d2c1e, 0.0075);
+
+// Perfectly Centered & Responsively Framed Camera Setup
+const camera = new THREE.PerspectiveCamera(44, window.innerWidth / window.innerHeight, 0.5, 450);
+
+let userZoom = 1.0;
+
+function updateCameraPosition() {
+  const aspect = window.innerWidth / window.innerHeight;
+  const fovRad = (camera.fov * Math.PI) / 180;
+  const targetDiameter = 84; // Bounds for all 7 rings + outer boundary + Jayadratha
+  
+  // Dynamic distance calculation ensuring fit both horizontally and vertically
+  const minAspect = Math.min(1.0, aspect);
+  let baseDist = (targetDiameter / (2 * Math.tan(fovRad / 2) * minAspect)) * 1.08;
+  baseDist *= userZoom;
+
+  if (game.viewMode === '3d') {
+    const tiltRad = (60 * Math.PI) / 180;
+    const posY = baseDist * Math.sin(tiltRad);
+    const posZ = baseDist * Math.cos(tiltRad);
+    camera.position.set(0, posY, posZ);
+    camera.lookAt(0, -1, 0);
+  } else {
+    camera.position.set(0, baseDist, 0);
+    camera.lookAt(0, 0, 0);
+  }
+}
+updateCameraPosition();
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+container.appendChild(renderer.domElement);
+
+// Lighting: Warm Golden Sand Kurukshetra Sun
+const ambientLight = new THREE.AmbientLight(0xfbeef0, 0.85);
+scene.add(ambientLight);
+
+const sunLight = new THREE.DirectionalLight(0xfff3d6, 1.7);
+sunLight.position.set(40, 75, 40);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.width = 2048;
+sunLight.shadow.mapSize.height = 2048;
+sunLight.shadow.camera.near = 10;
+sunLight.shadow.camera.far = 170;
+sunLight.shadow.camera.left = -50;
+sunLight.shadow.camera.right = 50;
+sunLight.shadow.camera.top = 50;
+sunLight.shadow.camera.bottom = -50;
+scene.add(sunLight);
+
+const warmSandFill = new THREE.DirectionalLight(0xd97706, 0.45);
+warmSandFill.position.set(-40, 25, -30);
+scene.add(warmSandFill);
+
+// Kurukshetra Sandish-Brown Battle Ground
+const groundGeo = new THREE.CylinderGeometry(56, 56, 1.0, 64);
+const groundMat = new THREE.MeshStandardMaterial({
+  color: 0x9c7a4e, // Sandish brown
+  roughness: 0.88,
+  metalness: 0.12
+});
+const battlefield = new THREE.Mesh(groundGeo, groundMat);
+battlefield.position.y = -0.5;
+battlefield.receiveShadow = true;
+scene.add(battlefield);
+
+// Sandstone Battlefield Props (Chariot Wheels, Stone Boundary Steles, Saffron & Gold Flags)
+function buildSandPlainsProps() {
+  const propsGroup = new THREE.Group();
+  
+  // Saffron & Gold War Banners around the perimeter
+  for (let i = 0; i < 16; i++) {
+    const angle = (i / 16) * Math.PI * 2;
+    const rad = 44 + (i % 3) * 2.5;
+    const bannerGroup = new THREE.Group();
+    
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 7.5), new THREE.MeshStandardMaterial({ color: 0x6b4e31 }));
+    pole.position.y = 3.75;
+    bannerGroup.add(pole);
+
+    const flagMat = new THREE.MeshStandardMaterial({
+      color: i % 2 === 0 ? 0xd97706 : 0xb45309,
+      roughness: 0.6,
+      side: THREE.DoubleSide
+    });
+    const flag = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.1, 0.04), flagMat);
+    flag.position.set(0.9, 6.2, 0);
+    bannerGroup.add(flag);
+
+    bannerGroup.position.set(rad * Math.cos(angle), 0, rad * Math.sin(angle));
+    propsGroup.add(bannerGroup);
+  }
+
+  // Wooden Spoked Chariot Wheels Half-Buried in Sand
+  for (let i = 0; i < 10; i++) {
+    const angle = (i / 10) * Math.PI * 2 + 0.35;
+    const rad = 39 + (i % 2) * 4;
+    const wheelGroup = new THREE.Group();
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(1.3, 0.12, 8, 24), new THREE.MeshStandardMaterial({ color: 0x5c4028, roughness: 0.85 }));
+    rim.rotation.x = Math.PI / 2.6;
+    wheelGroup.add(rim);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.45), new THREE.MeshStandardMaterial({ color: 0x785536 }));
+    hub.rotation.x = Math.PI / 2.6;
+    wheelGroup.add(hub);
+    wheelGroup.position.set(rad * Math.cos(angle), 0.35, rad * Math.sin(angle));
+    propsGroup.add(wheelGroup);
+  }
+
+  // Sandstone Boundary Monoliths
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2 + 0.7;
+    const rad = 48;
+    const stele = new THREE.Mesh(new THREE.BoxGeometry(1.2, 4.0, 0.8), new THREE.MeshStandardMaterial({ color: 0x826543, roughness: 0.9 }));
+    stele.position.set(rad * Math.cos(angle), 2.0, rad * Math.sin(angle));
+    stele.rotation.y = -angle;
+    stele.castShadow = true;
+    propsGroup.add(stele);
+  }
+  
+  scene.add(propsGroup);
+}
+buildSandPlainsProps();
+
+// Concentric Circular Sandstone Pathway Inscriptions with Golden Glow
+for (let r = 1; r <= NUM_RINGS + 1; r++) {
+  const rad = game.getRingRadius(r === NUM_RINGS + 1 ? 8 : r);
+  const trackGeo = new THREE.RingGeometry(rad - 0.14, rad + 0.14, 64);
+  const trackMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.28, side: THREE.DoubleSide });
+  const trackMesh = new THREE.Mesh(trackGeo, trackMat);
+  trackMesh.rotation.x = Math.PI / 2;
+  trackMesh.position.y = 0.02;
+  scene.add(trackMesh);
+}
+
+// 3D Ring Groups
+const ringMeshes = {};
+const guardMeshes = [];
+const lotusMeshes = [];
+
+// Grand Vedic Torana Gate Builder (Distinct Entrance vs Exit)
+function createGrandGate(colorHex, isExit = false) {
+  const group = new THREE.Group();
+  
+  // Carved Sandstone Monolith Pillars
+  const pillarGeo = new THREE.BoxGeometry(0.65, 3.8, 0.65);
+  const pillarMat = new THREE.MeshStandardMaterial({ color: 0x6e5235, roughness: 0.7, metalness: 0.25 });
+  const p1 = new THREE.Mesh(pillarGeo, pillarMat); p1.position.set(-1.2, 1.9, 0); p1.castShadow = true; group.add(p1);
+  const p2 = new THREE.Mesh(pillarGeo, pillarMat); p2.position.set(1.2, 1.9, 0); p2.castShadow = true; group.add(p2);
+
+  // Stepped Stone Bases
+  [-1.2, 1.2].forEach(px => {
+    const base = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.45, 0.95), pillarMat);
+    base.position.set(px, 0.22, 0);
+    group.add(base);
+  });
+
+  // Torana Double Arch Crossbeams
+  const beamMat = new THREE.MeshStandardMaterial({ color: colorHex, emissive: colorHex, emissiveIntensity: 0.75, roughness: 0.2 });
+  const b1 = new THREE.Mesh(new THREE.BoxGeometry(3.1, 0.4, 0.7), beamMat); b1.position.set(0, 3.5, 0); b1.castShadow = true; group.add(b1);
+  const b2 = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.3, 0.6), beamMat); b2.position.set(0, 2.9, 0); group.add(b2);
+
+  // Crown Ornament / Celestial Spire
+  if (isExit) {
+    const portalRing = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.12, 16, 32), beamMat);
+    portalRing.position.set(0, 1.8, 0);
+    group.add(portalRing);
+    const spire = new THREE.Mesh(new THREE.OctahedronGeometry(0.45), beamMat);
+    spire.position.set(0, 4.1, 0);
+    group.add(spire);
+  } else {
+    const sunSpire = new THREE.Mesh(new THREE.ConeGeometry(0.45, 0.95, 8), beamMat);
+    sunSpire.position.set(0, 4.1, 0);
+    group.add(sunSpire);
+  }
+
+  // Torches on Pillars
+  [-1.2, 1.2].forEach(px => {
+    const brazier = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.15, 0.35, 8), new THREE.MeshStandardMaterial({ color: 0x422f1d, metalness: 0.7 }));
+    brazier.position.set(px, 3.9, 0);
+    group.add(brazier);
+
+    const flameLight = new THREE.PointLight(colorHex, 0.9, 7);
+    flameLight.position.set(px, 4.2, 0);
+    group.add(flameLight);
+  });
+
+  // Vertical Light Shaft Beacon
+  const beamGeo = new THREE.CylinderGeometry(0.9, 0.9, 14, 16);
+  const lightBeamMat = new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.22, side: THREE.DoubleSide });
+  const lightBeam = new THREE.Mesh(beamGeo, lightBeamMat);
+  lightBeam.position.y = 7;
+  group.add(lightBeam);
+
+  group.userData = { beamMat, lightBeam, isExit };
+  return group;
+}
+
+// Build 7 Formidable Sandstone Rampart Walls
+for (let r = 1; r <= NUM_RINGS; r++) {
+  const ringGroup = new THREE.Group();
+  const radius = game.getRingRadius(r);
+  const wallHeight = 2.0 + (8 - r) * 0.14;
+  const wallThickness = 0.55;
+  const gateGap = 0.42; // Gateway gap in radians
+
+  // Sandstone Wall Outer Shell
+  const wallGeo = new THREE.CylinderGeometry(radius, radius, wallHeight, 64, 1, true, gateGap / 2, Math.PI * 2 - gateGap);
+  const wallMat = new THREE.MeshStandardMaterial({
+    color: 0x7c6042, // Sandstone wall
+    roughness: 0.8,
+    metalness: 0.2,
+    side: THREE.DoubleSide
+  });
+  const wallMesh = new THREE.Mesh(wallGeo, wallMat);
+  wallMesh.position.y = wallHeight / 2;
+  wallMesh.castShadow = true;
+  wallMesh.receiveShadow = true;
+  ringGroup.add(wallMesh);
+
+  // Sandstone Wall Inner Shell (True 3D thickness)
+  const innerWallGeo = new THREE.CylinderGeometry(radius - wallThickness, radius - wallThickness, wallHeight, 64, 1, true, gateGap / 2, Math.PI * 2 - gateGap);
+  const innerWallMesh = new THREE.Mesh(innerWallGeo, wallMat);
+  innerWallMesh.position.y = wallHeight / 2;
+  ringGroup.add(innerWallMesh);
+
+  // Golden Rampart Battlement Top Trim
+  const trimGeo = new THREE.TorusGeometry(radius, 0.16, 8, 64, Math.PI * 2 - gateGap);
+  const trimMat = new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.75, roughness: 0.3 });
+  const trimMesh = new THREE.Mesh(trimGeo, trimMat);
+  trimMesh.rotation.x = Math.PI / 2;
+  trimMesh.position.y = wallHeight;
+  trimMesh.rotation.z = gateGap / 2;
+  ringGroup.add(trimMesh);
+
+  // Crenellations (Fortress Merlons)
+  const numMerlons = 24 + r * 6;
+  const merlonGeo = new THREE.BoxGeometry(0.4, 0.35, wallThickness + 0.1);
+  const merlonMat = new THREE.MeshStandardMaterial({ color: 0x8a6c4c, roughness: 0.75 });
+  for (let m = 0; m < numMerlons; m++) {
+    const angle = (m / numMerlons) * (Math.PI * 2 - gateGap) + gateGap / 2;
+    const merlon = new THREE.Mesh(merlonGeo, merlonMat);
+    merlon.position.set(radius * Math.cos(angle), wallHeight + 0.18, radius * Math.sin(angle));
+    merlon.rotation.y = -angle;
+    ringGroup.add(merlon);
+  }
+
+  // Entry Gate (Radiant Golden Torana Arch)
+  const egRel = game.entryGateRelAngles[r];
+  const egGroup = createGrandGate(0xfbbf24, false);
+  egGroup.position.set(radius * Math.cos(egRel), 0, radius * Math.sin(egRel));
+  egGroup.rotation.y = -egRel + Math.PI / 2;
+  ringGroup.add(egGroup);
+
+  // Exit Gate (Mystic Cyan Celestial Torana)
+  const exRel = game.exitGateRelAngles[r];
+  const exGroup = createGrandGate(0x06b6d4, true);
+  exGroup.position.set(radius * Math.cos(exRel), 0, radius * Math.sin(exRel));
+  exGroup.rotation.y = -exRel + Math.PI / 2;
+  ringGroup.add(exGroup);
+
+  ringGroup.userData = { entryArch: egGroup, exitArch: exGroup, radius };
+  scene.add(ringGroup);
+  ringMeshes[r] = ringGroup;
+}
+
+// ==================== DEFINED HUMANOID WARRIOR BUILDERS ====================
+
+function buildDetailedWarrior({ role, armorColor, crownColor, weaponType, scale = 1.0 }) {
+  const root = new THREE.Group();
+  root.scale.set(scale, scale, scale);
+
+  const skinMat = new THREE.MeshStandardMaterial({ color: 0xdfa070, roughness: 0.55 });
+  const armorMat = new THREE.MeshStandardMaterial({ color: armorColor, metalness: 0.75, roughness: 0.3 });
+  const goldMat = new THREE.MeshStandardMaterial({ color: crownColor || 0xfbbf24, metalness: 0.85, roughness: 0.2 });
+  const clothMat = new THREE.MeshStandardMaterial({
+    color: role === 'abhimanyu' ? 0x2563eb : (role === 'bhima' ? 0x15803d : (role === 'guard' ? 0x991b1b : 0x16a34a)),
+    roughness: 0.6
+  });
+
+  // 1. Legs with Armored Greaves
+  [-0.22, 0.22].forEach(lx => {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.1, 0.95, 8), armorMat);
+    leg.position.set(lx, 0.48, 0);
+    leg.castShadow = true;
+    root.add(leg);
+  });
+
+  // 2. Battle Dhoti / Sash
+  const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.44, 0.55, 12), clothMat);
+  skirt.position.y = 0.95;
+  root.add(skirt);
+
+  // 3. Torso Armor (Royal Kavacha Cuirass with Gold Emblems)
+  const chest = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.8, 0.48), armorMat);
+  chest.position.y = 1.5;
+  chest.castShadow = true;
+  root.add(chest);
+
+  // Gold Chest Emblem / Medallion
+  const medal = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.08, 8), goldMat);
+  medal.rotation.x = Math.PI / 2;
+  medal.position.set(0, 1.55, 0.26);
+  root.add(medal);
+
+  // 4. Arms & Pauldron Shoulder Guards
+  [-0.44, 0.44].forEach(ax => {
+    const pauldron = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), goldMat);
+    pauldron.position.set(ax, 1.8, 0);
+    root.add(pauldron);
+
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.08, 0.7, 8), skinMat);
+    arm.position.set(ax, 1.4, 0);
+    root.add(arm);
+  });
+
+  // 5. Head with Royal Vedic Mukuta Crown
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 12, 12), skinMat);
+  head.position.y = 2.12;
+  root.add(head);
+
+  // Crown Base & Ornate Spire
+  const crownBase = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.22, 12), goldMat);
+  crownBase.position.y = 2.3;
+  root.add(crownBase);
+  const crownSpire = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.45, 8), goldMat);
+  crownSpire.position.y = 2.58;
+  root.add(crownSpire);
+
+  // Abhimanyu Mor Pankh (Peacock Feather Plume on Crown)
+  if (role === 'abhimanyu') {
+    const plume = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.4, 0.15), new THREE.MeshStandardMaterial({ color: 0x06b6d4, emissive: 0x0284c7, emissiveIntensity: 0.8 }));
+    plume.position.set(0, 2.85, 0.05);
+    plume.rotation.z = 0.2;
+    root.add(plume);
+
+    // Glowing Hero Halo Ring overhead
+    const halo = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.04, 8, 24), new THREE.MeshBasicMaterial({ color: 0xfde047 }));
+    halo.rotation.x = Math.PI / 2;
+    halo.position.y = 3.2;
+    root.add(halo);
+  }
+
+  // 6. Character-Specific Weapons
+  if (weaponType === 'bow') {
+    // Royal Golden Bow in Left Hand
+    const bow = new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.05, 8, 16, Math.PI), goldMat);
+    bow.position.set(-0.48, 1.4, 0.22);
+    bow.rotation.z = Math.PI / 2;
+    root.add(bow);
+
+    // Quiver on Back with Arrows
+    const quiver = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.09, 0.85, 8), goldMat);
+    quiver.position.set(0.18, 1.55, -0.32);
+    quiver.rotation.z = 0.3;
+    root.add(quiver);
+  } else if (weaponType === 'mace') {
+    // Bhima's Giant War Mace (Gada)
+    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.2), new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.9 }));
+    handle.position.set(0.5, 1.5, 0.2);
+    root.add(handle);
+    const mHead = new THREE.Mesh(new THREE.SphereGeometry(0.35, 10, 10), goldMat);
+    mHead.position.set(0.5, 2.5, 0.2);
+    root.add(mHead);
+  } else if (weaponType === 'sword') {
+    // Yudhishthira / Follower Sword & Shield
+    const sword = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.3, 0.04), new THREE.MeshStandardMaterial({ color: 0xf1f5f9, metalness: 0.9 }));
+    sword.position.set(0.48, 1.35, 0.2);
+    root.add(sword);
+    const shield = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.07, 16), new THREE.MeshStandardMaterial({ color: 0x166534, metalness: 0.6 }));
+    shield.rotation.x = Math.PI / 2;
+    shield.position.set(-0.48, 1.4, 0.25);
+    root.add(shield);
+  } else if (weaponType === 'spear') {
+    // Spear & Spiked Shield
+    const spearPole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.7, 8), new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.8 }));
+    spearPole.position.set(0.5, 1.65, 0.2);
+    root.add(spearPole);
+    const spearHead = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.4, 8), goldMat);
+    spearHead.position.set(0.5, 3.0, 0.2);
+    root.add(spearHead);
+
+    const shield = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.46, 0.08, 16), new THREE.MeshStandardMaterial({ color: 0x7f1d1d, metalness: 0.6 }));
+    shield.rotation.x = Math.PI / 2;
+    shield.position.set(-0.48, 1.4, 0.25);
+    root.add(shield);
+  }
+
+  return root;
+}
+
+// 1. Abhimanyu Hero Mesh (Blue & Gold Prince-Archer)
+const heroWarrior = buildDetailedWarrior({ role: 'abhimanyu', armorColor: 0x1e3a8a, crownColor: 0xfde047, weaponType: 'bow', scale: 1.15 });
+const heroGroup = new THREE.Group();
+heroGroup.add(heroWarrior);
+
+const heroLight = new THREE.PointLight(0x60a5fa, 1.8, 15);
+heroLight.position.y = 2.9;
+heroGroup.add(heroLight);
+scene.add(heroGroup);
+
+// 2. 4 Pandava Followers with Distinct Defined Weapons
+const followerMeshes = [];
+const followerConfigs = [
+  { role: 'bhima', weapon: 'mace', color: 0x15803d },
+  { role: 'yudhi', weapon: 'sword', color: 0x166534 },
+  { role: 'nakula', weapon: 'sword', color: 0x14532d },
+  { role: 'sahadeva', weapon: 'spear', color: 0x047857 }
+];
+game.followers.forEach((f, idx) => {
+  const cfg = followerConfigs[idx];
+  const fWarrior = buildDetailedWarrior({ role: cfg.role, armorColor: cfg.color, crownColor: 0x4ade80, weaponType: cfg.weapon, scale: idx === 0 ? 1.12 : 1.0 });
+  const fGroup = new THREE.Group();
+  fGroup.add(fWarrior);
+  scene.add(fGroup);
+  followerMeshes.push(fGroup);
+});
+
+// 3. Kaurava Guard Warriors (Defined Spearmen with Red Armor scaling per ring)
+game.guards.forEach(g => {
+  const scale = 0.98 + (8 - g.ring) * 0.08;
+  const gWarrior = buildDetailedWarrior({
+    role: 'guard',
+    armorColor: g.ring <= 3 ? 0x450a0a : 0x991b1b,
+    crownColor: g.ring <= 3 ? 0xef4444 : 0xf59e0b,
+    weaponType: 'spear',
+    scale: scale
+  });
+  const gGroup = new THREE.Group();
+  gGroup.add(gWarrior);
+  scene.add(gGroup);
+  guardMeshes.push({ group: gGroup, data: g });
+});
+
+// 4. Jayadratha Heavy Guardian at Outer Gate
+const jayadrathaGroup = new THREE.Group();
+const jWarrior = buildDetailedWarrior({ role: 'jayadratha', armorColor: 0x3b0764, crownColor: 0xc084fc, weaponType: 'none', scale: 1.6 });
+jayadrathaGroup.add(jWarrior);
+
+// Giant Spiked War Mace
+const jMacePole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 3.4), new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9 }));
+jMacePole.position.set(0.9, 1.8, 0.3);
+jMacePole.rotation.z = -0.3;
+jayadrathaGroup.add(jMacePole);
+const jMaceHead = new THREE.Mesh(new THREE.SphereGeometry(0.48, 12, 12), new THREE.MeshStandardMaterial({ color: 0x581c87, metalness: 0.9 }));
+jMaceHead.position.set(1.35, 3.1, 0.3);
+jayadrathaGroup.add(jMaceHead);
+
+// Sealed Stone Gate Slab
+const jSlabGeo = new THREE.BoxGeometry(2.6, 4.2, 0.8);
+const jSlabMat = new THREE.MeshStandardMaterial({ color: 0x521f14, emissive: 0x240a05, emissiveIntensity: 0.6 });
+const jSlab = new THREE.Mesh(jSlabGeo, jSlabMat);
+jSlab.position.set(0, -5, 0);
+jayadrathaGroup.add(jSlab);
+
+const r7Rad = game.getRingRadius(7);
+const eg7Rel = game.entryGateRelAngles[7];
+jayadrathaGroup.position.set((r7Rad + 2.8) * Math.cos(eg7Rel), 0, (r7Rad + 2.8) * Math.sin(eg7Rel));
+jayadrathaGroup.rotation.y = -eg7Rel + Math.PI / 2;
+scene.add(jayadrathaGroup);
+
+// 5. Sacred Lotus Pickups (Floating Lotus Blosson)
+game.lotuses.forEach(l => {
+  const lotGroup = new THREE.Group();
+  for (let p = 0; p < 8; p++) {
+    const petal = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.1, 0.65), new THREE.MeshStandardMaterial({ color: 0xf472b6, emissive: 0xdb2777, emissiveIntensity: 0.65 }));
+    petal.rotation.y = (p / 8) * Math.PI * 2;
+    petal.position.set(0.32 * Math.cos(petal.rotation.y), 0, 0.32 * Math.sin(petal.rotation.y));
+    lotGroup.add(petal);
+  }
+  const core = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 10), new THREE.MeshStandardMaterial({ color: 0xfbbf24, emissive: 0xf59e0b, emissiveIntensity: 1.0 }));
+  core.position.y = 0.15; lotGroup.add(core);
+
+  const lotusLight = new THREE.PointLight(0xf472b6, 0.9, 6);
+  lotusLight.position.y = 0.5; lotGroup.add(lotusLight);
+  scene.add(lotGroup);
+  lotusMeshes.push({ group: lotGroup, data: l });
+});
+
+// 6. Central Sanctum Core (Ring 0)
+const coreGroup = new THREE.Group();
+const coreBaseGeo = new THREE.CylinderGeometry(CORE_RADIUS, CORE_RADIUS + 0.6, 1.4, 32);
+const coreBaseMat = new THREE.MeshStandardMaterial({ color: 0xb45309, emissive: 0x78350f, emissiveIntensity: 0.5, metalness: 0.6 });
+const coreBase = new THREE.Mesh(coreBaseGeo, coreBaseMat);
+coreBase.position.y = 0.7; coreGroup.add(coreBase);
+
+const crystalGeo = new THREE.OctahedronGeometry(1.8, 0);
+const crystalMat = new THREE.MeshStandardMaterial({ color: 0xfef08a, emissive: 0xf59e0b, emissiveIntensity: 1.2, roughness: 0.1 });
+const crystal = new THREE.Mesh(crystalGeo, crystalMat);
+crystal.position.y = 3.2; coreGroup.add(crystal);
+
+const coreLight = new THREE.PointLight(0xfbbf24, 2.2, 22);
+coreLight.position.y = 3.5; coreGroup.add(coreLight);
+scene.add(coreGroup);
+
+// Drifting Battlefield Sand & Golden Fire Embers
+const particleCount = 140;
+const particleGeo = new THREE.BufferGeometry();
+const particlePos = new Float32Array(particleCount * 3);
+for (let i = 0; i < particleCount * 3; i += 3) {
+  particlePos[i] = (Math.random() - 0.5) * 90;
+  particlePos[i+1] = Math.random() * 22;
+  particlePos[i+2] = (Math.random() - 0.5) * 90;
+}
+particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePos, 3));
+const particleMat = new THREE.PointsMaterial({ color: 0xf59e0b, size: 0.48, transparent: true, opacity: 0.85 });
+const particleSystem = new THREE.Points(particleGeo, particleMat);
+scene.add(particleSystem);
+
+// --- ANIMATION & RENDER LOOP ---
+let lastTime = performance.now();
+
+function animate(currentTime) {
+  requestAnimationFrame(animate);
+  const dt = Math.min((currentTime - lastTime) / 1000, 0.1);
+  lastTime = currentTime;
+
+  game.update(dt);
+
+  let promptShown = false;
+
+  // Update 3D Rings & Gate Beacons
+  for (let r = 1; r <= NUM_RINGS; r++) {
+    const ringGroup = ringMeshes[r];
+    ringGroup.rotation.y = game.ringAngles[r];
+
+    const isExitPhase = game.reachedCore;
+    const gateAngle = game.getGateWorldAngle(r, isExitPhase);
+    const isTargetRing = (isExitPhase && r === game.player.ring) || (!isExitPhase && (r === game.player.ring - 1 || (game.player.ring === 8 && r === 7)));
+    const isAligned = isTargetRing && (game.diffAngle(game.player.angle, gateAngle) < GATE_TOLERANCE);
+
+    if (isAligned && !game.gameOver) {
+      promptShown = true;
+    }
+
+    // Update Gate Arch Beacons & Glow
+    const activeArch = isExitPhase ? ringGroup.userData.exitArch : ringGroup.userData.entryArch;
+    if (activeArch) {
+      activeArch.userData.lightBeam.material.opacity = isAligned ? 0.9 : 0.22;
+      activeArch.userData.beamMat.emissiveIntensity = isAligned ? 1.8 : 0.65;
+    }
+
+    // Fog of War on Exit Gates
+    const exitAngle = game.getGateWorldAngle(r, true);
+    const visible = game.hasVision(r, exitAngle) || game.player.ring <= r || game.reachedCore;
+    ringGroup.userData.exitArch.visible = visible;
+  }
+
+  // Update Gate Prompt HUD
+  const promptEl = document.getElementById('gate-prompt-hud');
+  if (promptShown) {
+    promptEl.style.display = 'block';
+    promptEl.innerText = game.reachedCore ? '✨ EXIT GATE ALIGNED! PRESS OUT [S] TO ESCAPE' : '✨ ENTRY GATE ALIGNED! PRESS IN [W] TO ENTER';
+  } else {
+    promptEl.style.display = 'none';
+  }
+
+  // Update Abhimanyu Mesh Position & Dynamic Breathing
+  if (game.player.ring === 0) {
+    heroGroup.position.set(0, 0.7, 0);
+  } else {
+    const rad = game.getRingRadius(game.player.ring);
+    heroGroup.position.set(rad * Math.cos(game.player.angle), 0, rad * Math.sin(game.player.angle));
+    heroGroup.rotation.y = -game.player.angle + Math.PI / 2;
+  }
+
+  // Update Followers Position
+  followerMeshes.forEach((fMesh, idx) => {
+    const f = game.followers[idx];
+    const rad = game.getRingRadius(f.ring);
+    fMesh.position.set(rad * Math.cos(f.angle), 0, rad * Math.sin(f.angle));
+    fMesh.rotation.y = -f.angle + Math.PI / 2;
+  });
+
+  // Update Kaurava Guards Position
+  guardMeshes.forEach(gm => {
+    const g = gm.data;
+    if (!g.alive) { gm.group.visible = false; return; }
+    const rad = game.getRingRadius(g.ring);
+    const wAngle = (game.ringAngles[g.ring] + g.relAngle) % (Math.PI * 2);
+    gm.group.position.set(rad * Math.cos(wAngle), 0, rad * Math.sin(wAngle));
+    gm.group.rotation.y = -wAngle + Math.PI / 2;
+  });
+
+  // Update Sacred Lotus Meshes
+  lotusMeshes.forEach(lm => {
+    const l = lm.data;
+    if (!l.active) { lm.group.visible = false; return; }
+    const rad = game.getRingRadius(l.ring);
+    const wAngle = (game.ringAngles[l.ring] + l.relAngle) % (Math.PI * 2);
+    lm.group.position.set(rad * Math.cos(wAngle), 0.6 + Math.sin(currentTime * 0.004) * 0.25, rad * Math.sin(wAngle));
+    lm.group.rotation.y += 0.025;
+  });
+
+  // Animate Jayadratha Stone Slab Closure
+  if (game.jayadrathaSealed && jSlab.position.y < 2.0) {
+    jSlab.position.y += dt * 8.5;
+  }
+
+  // Animate Central Sanctum Crystal
+  crystal.rotation.y += 0.02;
+  crystal.position.y = 3.2 + Math.sin(currentTime * 0.003) * 0.3;
+
+  // Animate Floating Sand Embers
+  const pAttr = particleGeo.attributes.position;
+  for (let i = 1; i < particleCount * 3; i += 3) {
+    pAttr.array[i] += dt * 1.5;
+    if (pAttr.array[i] > 22) pAttr.array[i] = 0;
+  }
+  pAttr.needsUpdate = true;
+
+  // Render
+  renderer.render(scene, camera);
+}
+requestAnimationFrame(animate);
+
+// --- UI EVENT HANDLERS ---
+function updateHUD() {
+  document.getElementById('txt-hp').innerText = `${Math.max(0, game.health)} / ${game.maxHealth} HP`;
+  const pct = Math.max(0, (game.health / game.maxHealth) * 100);
+  document.getElementById('bar-hp').style.width = `${pct}%`;
+  
+  const ringStr = game.player.ring === 0 ? 'Sanctum Core' : (game.player.ring === 8 ? 'Outside (R8)' : `Ring ${game.player.ring}`);
+  document.getElementById('txt-ring').innerText = ringStr;
+  
+  const m = Math.floor(game.timeLeft / 60);
+  const s = Math.floor(game.timeLeft % 60);
+  document.getElementById('txt-time').innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
+  
+  document.getElementById('txt-valor').innerText = `${game.valor} / 3`;
+  document.getElementById('txt-core').innerText = game.reachedCore ? 'Breached (★)' : 'Unbreached';
+  document.getElementById('txt-core').style.color = game.reachedCore ? '#22c55e' : '#ef4444';
+  document.getElementById('txt-ally-count').innerText = game.allyCharges;
+}
+
+function logDispatch(msg, cls = 'log-info') {
+  const box = document.getElementById('event-log');
+  const line = document.createElement('div');
+  line.className = `log-line ${cls}`;
+  const m = Math.floor((120 - game.timeLeft) / 60);
+  const s = Math.floor((120 - game.timeLeft) % 60);
+  line.innerText = `[${m}:${s < 10 ? '0' : ''}${s}] ${msg}`;
+  box.prepend(line);
+}
+
+function showAlignmentAlert() {
+  const b = document.getElementById('align-banner');
+  b.classList.add('show');
+  setTimeout(() => b.classList.remove('show'), 900);
+}
+
+function triggerDamageShake() {
+  document.body.classList.remove('shake');
+  void document.body.offsetWidth;
+  document.body.classList.add('shake');
+}
+
+function showEndScreen(won, reason = '') {
+  const o = document.getElementById('overlay-gameover');
+  o.classList.remove('hidden');
+  document.getElementById('end-title').innerText = won ? '🏆 VICTORY: DHARMA UPHELD' : '💀 DEFEAT ON DAY 13';
+  document.getElementById('end-title').style.color = won ? '#4ade80' : '#f87171';
+  document.getElementById('end-desc').innerText = won ? 'Abhimanyu breached the core and broke through the Chakravyuha!' : (reason || 'The warrior fell in battle.');
+  
+  const score = Math.max(0, Math.min(100, Math.round(100 - (120 - game.timeLeft) * 0.3 - (100 - game.health) * 0.4 + game.guardsDefeated * 8)));
+  const rank = score >= 90 ? 'Maharathi' : (score >= 70 ? 'Atirathi' : (score >= 50 ? 'Rathi' : 'Sainik'));
+  document.getElementById('end-rank').innerText = `Chakravyuha Score: ${score}/100 — Rank: ${rank}`;
+
+  document.getElementById('end-stats').innerHTML = `
+    <div class="stat-row"><span>Time Taken:</span><b>${Math.floor(120 - game.timeLeft)}s</b></div>
+    <div class="stat-row"><span>Health Remaining:</span><b>${Math.max(0, game.health)} HP</b></div>
+    <div class="stat-row"><span>Gates Crossed:</span><b>${game.gatesPassed}</b></div>
+    <div class="stat-row"><span>Guards Defeated:</span><b>${game.guardsDefeated}</b></div>
+  `;
+}
+
+// User Action Bindings
+document.getElementById('btn-start-council').onclick = () => {
+  document.getElementById('overlay-start').classList.add('hidden');
+  document.getElementById('overlay-council').classList.remove('hidden');
+};
+
+document.getElementById('btn-enter-battle').onclick = () => {
+  sfx.init();
+  document.getElementById('overlay-council').classList.add('hidden');
+  game = new GameState();
+  logDispatch('🏹 Day 13: Abhimanyu and 4 Pandavas advance across Kurukshetra sands!', 'log-success');
+  updateHUD();
+};
+
+document.getElementById('btn-playagain').onclick = () => {
+  document.getElementById('overlay-gameover').classList.add('hidden');
+  game = new GameState();
+  updateHUD();
+};
+document.getElementById('btn-rematch').onclick = () => {
+  document.getElementById('overlay-gameover').classList.add('hidden');
+  document.getElementById('overlay-council').classList.remove('hidden');
+};
+
+document.getElementById('btn-zoom-in').onclick = () => {
+  userZoom = Math.max(0.65, userZoom - 0.12);
+  updateCameraPosition();
+};
+document.getElementById('btn-zoom-out').onclick = () => {
+  userZoom = Math.min(1.8, userZoom + 0.12);
+  updateCameraPosition();
+};
+
+document.getElementById('btn-speed').onclick = (e) => {
+  if (game.speedMultiplier === 1.0) { game.speedMultiplier = 1.8; e.target.innerText = '⚡ Speed: Fast'; }
+  else if (game.speedMultiplier === 1.8) { game.speedMultiplier = 0.5; e.target.innerText = '⚡ Speed: Slow'; }
+  else { game.speedMultiplier = 1.0; e.target.innerText = '⚡ Speed: 1x'; }
+};
+
+document.getElementById('btn-pause').onclick = (e) => {
+  game.paused = !game.paused;
+  e.target.innerText = game.paused ? '▶️ Resume' : '⏸️ Pause';
+};
+
+document.getElementById('btn-view').onclick = (e) => {
+  if (game.viewMode === '3d') {
+    game.viewMode = 'top';
+    e.target.innerText = '📐 View: Top';
+  } else {
+    game.viewMode = '3d';
+    e.target.innerText = '📐 View: 3D';
+  }
+  updateCameraPosition();
+};
+
+document.getElementById('btn-sound').onclick = (e) => {
+  sfx.muted = !sfx.muted;
+  e.target.innerText = sfx.muted ? '🔇 Unmute' : '🔊 Mute';
+};
+
+document.getElementById('btn-help').onclick = () => document.getElementById('overlay-help').classList.remove('hidden');
+document.getElementById('btn-close-help').onclick = () => document.getElementById('overlay-help').classList.add('hidden');
+document.getElementById('btn-menu').onclick = () => document.getElementById('overlay-council').classList.remove('hidden');
+document.getElementById('btn-ally').onclick = () => game.callAlly();
+
+// Council Card Selection
+document.querySelectorAll('.council-card').forEach(card => {
+  card.onclick = () => {
+    const type = card.dataset.type;
+    document.querySelectorAll(`.council-card[data-type="${type}"]`).forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+  };
+});
+
+// Movement Controls
+document.getElementById('btn-up').onclick = () => game.movePlayer('in');
+document.getElementById('btn-down').onclick = () => game.movePlayer('out');
+document.getElementById('btn-left').onclick = () => game.movePlayer('left');
+document.getElementById('btn-right').onclick = () => game.movePlayer('right');
+
+window.addEventListener('keydown', (e) => {
+  if (['ArrowUp', 'KeyW'].includes(e.code)) { e.preventDefault(); game.movePlayer('in'); }
+  else if (['ArrowDown', 'KeyS'].includes(e.code)) { e.preventDefault(); game.movePlayer('out'); }
+  else if (['ArrowLeft', 'KeyA'].includes(e.code)) { e.preventDefault(); game.movePlayer('left'); }
+  else if (['ArrowRight', 'KeyD'].includes(e.code)) { e.preventDefault(); game.movePlayer('right'); }
+  else if (e.code === 'Space') { e.preventDefault(); game.callAlly(); }
+  else if (e.key === '+' || e.key === '=') { userZoom = Math.max(0.65, userZoom - 0.1); updateCameraPosition(); }
+  else if (e.key === '-' || e.key === '_') { userZoom = Math.min(1.8, userZoom + 0.1); updateCameraPosition(); }
+});
+
+window.addEventListener('wheel', (e) => {
+  if (e.deltaY < 0) {
+    userZoom = Math.max(0.65, userZoom - 0.08);
+  } else {
+    userZoom = Math.min(1.8, userZoom + 0.08);
+  }
+  updateCameraPosition();
+}, { passive: true });
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  updateCameraPosition();
+});
+
+updateHUD();
+</script>
+</body>
+</html>
