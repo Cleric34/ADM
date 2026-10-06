@@ -1,5 +1,5 @@
 {
-  "buildCommand": "mkdir -p dist && cp -r index.html game dist",
-  "outputDirectory": "dist",
+  "buildCommand": "echo 'Building static Chakravyuha site'",
+  "outputDirectory": ".",
   "cleanUrls": true
 }
