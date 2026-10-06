@@ -1,5 +1,6 @@
 {
-  "buildCommand": "echo 'Building static Chakravyuha site'",
-  "outputDirectory": ".",
-  "cleanUrls": true
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.py" }
+  ]
 }
