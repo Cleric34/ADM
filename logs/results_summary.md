@@ -36,3 +36,24 @@ This report provides the empirical evaluation of 15,000 simulated episodes (500 
 3. **`shared_map` Maintained High Resilience Across High Difficulty:** `shared_map` achieved **48.9% ± 3.1%** success on high difficulty, outperforming `split_exit` (19.6% ± 2.5%) under severe defender pressure. *Hypothesis:* In `shared_map`, all 5 units move in mutual proximity, distributing defender damage across the group rather than leaving exposed scouts isolated in outer rings where high defender density causes early scout wipeouts (57.3% wipeout rate in high-difficulty `split_exit`).
 4. **`lone_entry` Suffered Severe Wipeout Rates Under Increasing Defender Density:** `lone_entry` succeeded in 42.8% ± 3.1% of low-difficulty runs, but experienced a 92.6% wipeout rate on medium difficulty (1.8% ± 0.8% success) and a 100.0% wipeout rate on high difficulty (0.0% success), demonstrating the vulnerability of an unsupported single infiltrator in dense combat zones.
 5. **Increased Communication Range Produced a Statistically Measurable Increase in `split_exit` Success:** For `split_exit`, expanding communication range from 4.0 to 15.0 grid units increased mission success rate from **57.4% ± 2.5% to 63.3% ± 2.4%** (+5.9 percentage points). For `shared_map`, the success rate was **58.7% ± 2.5%** at range 4.0 versus **59.4% ± 2.5%** at range 15.0 (overlapping confidence intervals).
+
+---
+
+## ⚠️ Limitations
+
+### Step Limit Evaluation (`max_steps = 400` vs `max_steps = 800`)
+To evaluate whether the 400-step horizon constitutes the primary bottleneck for timeouts, an empirical test across 200 random seeds (seeds 10000–10199) was conducted for `shared_map`, `blind_follow`, and `split_exit` at low difficulty and `comm_range = 15.0`:
+
+| Strategy | `max_steps` | Success Rate (%) | Wipeout Rate (%) | Timeout Rate (%) | Episodes with Attackers in Center during Timeout | Mean Center Attackers per Timeout |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **`shared_map`** | **400** | **69.0%** (138/200) | 0.0% (0/200) | 31.0% (62/200) | 100.0% (62/62) | 4.95 (of 5) |
+| **`shared_map`** | **800** | **69.0%** (138/200) | 0.0% (0/200) | 31.0% (62/200) | — | — |
+| **`blind_follow`** | **400** | **62.0%** (124/200) | 0.0% (0/200) | 38.0% (76/200) | 100.0% (76/76) | 1.21 (of 5) |
+| **`blind_follow`** | **800** | **62.0%** (124/200) | 0.0% (0/200) | 38.0% (76/200) | — | — |
+| **`split_exit`** | **400** | **91.0%** (182/200) | 0.0% (0/200) | 9.0% (18/200) | 100.0% (18/18) | 3.00 (of 5) |
+| **`split_exit`** | **800** | **91.0%** (182/200) | 0.0% (0/200) | 9.0% (18/200) | — | — |
+
+**Empirical Finding on Step Limit:**
+- Across all three strategies, doubling `max_steps` from 400 to 800 produced a **0.0% change in success rate** (0 additional successes across 200 seeds).
+- In 100% of timeout episodes at `max_steps = 400`, attackers had reached the center.
+- Therefore, the 400-step limit is **not** the primary cause of timeouts. Rather, timeouts occur because agents in the center lack discovered exit gate coordinates for outer rings, resulting in static holding patterns rather than a deficit of movement time.

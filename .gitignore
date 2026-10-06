@@ -20,10 +20,9 @@ htmlcov/
 # Logs & outputs
 logs/*
 !logs/.gitkeep
+!logs/*.md
 !logs/results.csv
 !logs/results_v1.csv
-!logs/results_summary.md
-!logs/weekly_log.md
 !logs/figures/
 !logs/figures/*
 *.log
