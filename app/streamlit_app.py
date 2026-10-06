@@ -68,6 +68,7 @@ st.markdown('<div class="sub-title">Modeling Drona Parva Tactical Penetration & 
 st.sidebar.header("⚙️ Simulation Controls")
 
 strategy_options = {
+    "oracle": "0. Oracle (Full Map Knowledge Baseline)",
     "lone_entry": "1. Lone Entry (Abhimanyu Alone)",
     "blind_follow": "2. Blind Follow (Followers Trail Without Comm)",
     "shared_map": "3. Shared Map (Dynamic Gate Messaging)",

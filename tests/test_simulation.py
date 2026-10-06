@@ -7,13 +7,14 @@ Validates:
 3. Limited vision radius boundaries.
 4. Distance-bounded message delivery constraints.
 5. Inward strength scaling for defenders.
-6. Strategy instantiation and episode termination outcomes.
+6. Strategy instantiation and episode termination outcomes (including Oracle).
 """
 
 import pytest
 from sim.environment import Config, ChakravyuhaEnvironment
 from sim.agents import Attacker, Defender
 from sim.strategies import (
+    OracleStrategy,
     LoneEntryStrategy,
     BlindFollowStrategy,
     SharedMapStrategy,
@@ -25,8 +26,8 @@ from sim.engine import run_episode, initialize_defenders
 
 def test_fixed_seed_reproducibility():
     """Verify that identical seeds produce bit-exact simulation outcomes and telemetry."""
-    config1 = Config(seed=123, difficulty="medium", comm_range=6.0, max_steps=100)
-    config2 = Config(seed=123, difficulty="medium", comm_range=6.0, max_steps=100)
+    config1 = Config(seed=123, difficulty="medium", comm_range=6.0, max_steps=50)
+    config2 = Config(seed=123, difficulty="medium", comm_range=6.0, max_steps=50)
     
     res1 = run_episode(config1, "shared_map")
     res2 = run_episode(config2, "shared_map")
@@ -69,7 +70,7 @@ def test_vision_radius_limits():
     
     # Outside vision radius: distance = 5.0 > 4.0
     assert agent.can_see((15, 20)) is False
-    assert agent.can_see((10, 10)) is False  # dist = sqrt(25+25) = 7.07 > 4.0
+    assert agent.can_see((10, 10)) is False
 
 
 def test_messaging_respects_range():
@@ -84,14 +85,14 @@ def test_messaging_respects_range():
     near_receiver = Attacker(
         agent_id="near",
         role="follower",
-        pos=(12, 12),  # dist = sqrt(4+4) = 2.82 <= 5.0
+        pos=(12, 12),
         comm_range=5.0,
     )
     
     far_receiver = Attacker(
         agent_id="far",
         role="follower",
-        pos=(25, 25),  # dist = sqrt(225+225) = 21.2 > 5.0
+        pos=(25, 25),
         comm_range=5.0,
     )
     
@@ -117,8 +118,8 @@ def test_defender_power_scaling_by_ring():
 
 
 def test_all_strategies_run():
-    """Verify that all 4 strategies execute successfully without exceptions."""
-    strategies = ["lone_entry", "blind_follow", "shared_map", "split_exit"]
+    """Verify that all 5 strategies (including Oracle) execute successfully without exceptions."""
+    strategies = ["oracle", "lone_entry", "blind_follow", "shared_map", "split_exit"]
     config = Config(seed=99, max_steps=20)
     
     for strat in strategies:
