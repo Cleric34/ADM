@@ -64,6 +64,13 @@ st.markdown("""
 st.markdown('<div class="main-title">🛡️ Chakravyuha Multi-Agent Simulation</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-title">Modeling Drona Parva Tactical Penetration & Trapping as Coordination Under Incomplete Information</div>', unsafe_allow_html=True)
 
+with st.expander("📖 How to read this screen"):
+    st.markdown("""
+    - **Grid Elements:** **Rings 1–7** (concentric walls, inner 1 to outer 7), **★ Core** (golden star center), **● Entry Gates** (green circles), **▼ Exit Gates** (teal triangles).
+    - **Key Entities:** **🔵 Abhimanyu** (infiltrator), **🟢 Followers** (Pandava infantry), **🟠 Scouts** (exit seekers), **▲ Defenders** (Kaurava guards, darker red = stronger inner Maharathis), **❌ Jayadratha** (red X = outer gate locked).
+    - **Outcomes:** **🟢 SUCCESS** (breached center & exited formation), **🔴 WIPEOUT** (all attackers fallen), **🟡 TRAPPED / TIMEOUT** (breached center but trapped inside without exit route, or max steps reached).
+    """)
+
 # ----------------- SIDEBAR CONTROLS -----------------
 st.sidebar.header("⚙️ Simulation Controls")
 
