@@ -1,27 +1,30 @@
 """
-Basic sanity tests for project modules.
+tests/test_basic.py - Sanity and Module Integration Verification.
 """
 
-from sim.environment import ChakravyuhaEnvironment
-from sim.agents import InfiltratorAgent, DefenderAgent
-from sim.strategies import PenetrationStrategy, RingDefenseStrategy
-from sim.engine import SimulationEngine
+from sim.environment import Config, ChakravyuhaEnvironment
+from sim.agents import Attacker, Defender
+from sim.strategies import LoneEntryStrategy, BlindFollowStrategy, SharedMapStrategy, SplitExitStrategy
+from sim.engine import run_episode
 
 
 def test_environment_initialization():
-    env = ChakravyuhaEnvironment(num_layers=7, grid_size=100)
-    assert env.num_layers == 7
-    assert env.grid_size == 100
+    config = Config(seed=42, num_rings=7, grid_size=31)
+    env = ChakravyuhaEnvironment(config)
+    assert env.config.num_rings == 7
+    assert env.grid_size == 31
+    assert len(env.entry_gates) == 7
+    assert len(env.exit_gates) == 7
 
 
 def test_agent_creation():
-    infiltrator = InfiltratorAgent(agent_id="abhimanyu")
-    defender = DefenderAgent(agent_id="drona", layer=1)
+    infiltrator = Attacker(agent_id="abhimanyu", role="infiltrator", pos=(0, 0))
+    defender = Defender(agent_id="drona", layer=1, pos=(15, 15))
     assert infiltrator.side == "pandava"
     assert defender.side == "kaurava"
 
 
 def test_engine_initialization():
-    engine = SimulationEngine()
-    result = engine.run()
-    assert result["status"] == "initialized"
+    config = Config(seed=42, max_steps=10)
+    result = run_episode(config, "lone_entry")
+    assert result["outcome"] in ["success", "wipeout", "timeout"]
