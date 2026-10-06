@@ -66,6 +66,7 @@ def run_all_experiments(
                         "outcome": res["outcome"],
                         "success": 1 if res["outcome"] == "success" else 0,
                         "wipeout": 1 if res["outcome"] == "wipeout" else 0,
+                        "trapped_inside": 1 if res["outcome"] == "trapped_inside" else 0,
                         "timeout": 1 if res["outcome"] == "timeout" else 0,
                         "steps": res["steps"],
                         "survivors": res["survivors"],

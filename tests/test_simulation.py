@@ -124,7 +124,7 @@ def test_all_strategies_run():
     
     for strat in strategies:
         res = run_episode(config, strat)
-        assert res["outcome"] in ["success", "wipeout", "timeout"]
+        assert res["outcome"] in ["success", "wipeout", "timeout", "trapped_inside"]
         assert 0 <= res["rings_breached"] <= 7
         assert res["steps"] > 0
         assert res["survivors"] >= 0

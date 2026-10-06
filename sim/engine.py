@@ -202,6 +202,10 @@ def run_episode(
             outcome = "wipeout"
             break
 
+    if outcome == "timeout":
+        if any(a.has_reached_center for a in attackers):
+            outcome = "trapped_inside"
+
     survivors = sum(1 for a in attackers if a.is_alive)
 
     result = {
