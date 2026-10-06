@@ -288,6 +288,8 @@ button.btn:disabled { opacity: 0.35; cursor: not-allowed; }
       <p>Kurukshetra Sand Plains — Continuous Dynamic Disc Rotation</p>
     </div>
     <div class="header-actions">
+      <button class="btn" id="btn-zoom-in" title="Zoom In">🔍 +</button>
+      <button class="btn" id="btn-zoom-out" title="Zoom Out">🔍 −</button>
       <button class="btn" id="btn-speed">⚡ Speed: 1x</button>
       <button class="btn" id="btn-pause">⏸️ Pause</button>
       <button class="btn" id="btn-view">📐 View: 3D</button>
@@ -791,10 +793,33 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x3d2c1e);
 scene.fog = new THREE.FogExp2(0x3d2c1e, 0.0075);
 
-// Perfectly Centered Camera Setup
-const camera = new THREE.PerspectiveCamera(44, window.innerWidth / window.innerHeight, 0.5, 350);
-camera.position.set(0, 60, 32);
-camera.lookAt(0, -1, 0);
+// Perfectly Centered & Responsively Framed Camera Setup
+const camera = new THREE.PerspectiveCamera(44, window.innerWidth / window.innerHeight, 0.5, 450);
+
+let userZoom = 1.0;
+
+function updateCameraPosition() {
+  const aspect = window.innerWidth / window.innerHeight;
+  const fovRad = (camera.fov * Math.PI) / 180;
+  const targetDiameter = 84; // Bounds for all 7 rings + outer boundary + Jayadratha
+  
+  // Dynamic distance calculation ensuring fit both horizontally and vertically
+  const minAspect = Math.min(1.0, aspect);
+  let baseDist = (targetDiameter / (2 * Math.tan(fovRad / 2) * minAspect)) * 1.08;
+  baseDist *= userZoom;
+
+  if (game.viewMode === '3d') {
+    const tiltRad = (60 * Math.PI) / 180;
+    const posY = baseDist * Math.sin(tiltRad);
+    const posZ = baseDist * Math.cos(tiltRad);
+    camera.position.set(0, posY, posZ);
+    camera.lookAt(0, -1, 0);
+  } else {
+    camera.position.set(0, baseDist, 0);
+    camera.lookAt(0, 0, 0);
+  }
+}
+updateCameraPosition();
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -1380,12 +1405,7 @@ function animate(currentTime) {
   }
   pAttr.needsUpdate = true;
 
-  // Centered Camera Framing
-  if (game.viewMode === '3d') {
-    camera.position.set(0, 60, 32);
-    camera.lookAt(0, -1, 0);
-  }
-
+  // Render
   renderer.render(scene, camera);
 }
 requestAnimationFrame(animate);
@@ -1474,6 +1494,15 @@ document.getElementById('btn-rematch').onclick = () => {
   document.getElementById('overlay-council').classList.remove('hidden');
 };
 
+document.getElementById('btn-zoom-in').onclick = () => {
+  userZoom = Math.max(0.65, userZoom - 0.12);
+  updateCameraPosition();
+};
+document.getElementById('btn-zoom-out').onclick = () => {
+  userZoom = Math.min(1.8, userZoom + 0.12);
+  updateCameraPosition();
+};
+
 document.getElementById('btn-speed').onclick = (e) => {
   if (game.speedMultiplier === 1.0) { game.speedMultiplier = 1.8; e.target.innerText = '⚡ Speed: Fast'; }
   else if (game.speedMultiplier === 1.8) { game.speedMultiplier = 0.5; e.target.innerText = '⚡ Speed: Slow'; }
@@ -1488,15 +1517,12 @@ document.getElementById('btn-pause').onclick = (e) => {
 document.getElementById('btn-view').onclick = (e) => {
   if (game.viewMode === '3d') {
     game.viewMode = 'top';
-    camera.position.set(0, 72, 0);
-    camera.lookAt(0, 0, 0);
     e.target.innerText = '📐 View: Top';
   } else {
     game.viewMode = '3d';
-    camera.position.set(0, 60, 32);
-    camera.lookAt(0, -1, 0);
     e.target.innerText = '📐 View: 3D';
   }
+  updateCameraPosition();
 };
 
 document.getElementById('btn-sound').onclick = (e) => {
@@ -1530,12 +1556,24 @@ window.addEventListener('keydown', (e) => {
   else if (['ArrowLeft', 'KeyA'].includes(e.code)) { e.preventDefault(); game.movePlayer('left'); }
   else if (['ArrowRight', 'KeyD'].includes(e.code)) { e.preventDefault(); game.movePlayer('right'); }
   else if (e.code === 'Space') { e.preventDefault(); game.callAlly(); }
+  else if (e.key === '+' || e.key === '=') { userZoom = Math.max(0.65, userZoom - 0.1); updateCameraPosition(); }
+  else if (e.key === '-' || e.key === '_') { userZoom = Math.min(1.8, userZoom + 0.1); updateCameraPosition(); }
 });
+
+window.addEventListener('wheel', (e) => {
+  if (e.deltaY < 0) {
+    userZoom = Math.max(0.65, userZoom - 0.08);
+  } else {
+    userZoom = Math.min(1.8, userZoom + 0.08);
+  }
+  updateCameraPosition();
+}, { passive: true });
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  updateCameraPosition();
 });
 
 updateHUD();
