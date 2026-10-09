@@ -446,7 +446,7 @@ import * as THREE from 'three';
 const NUM_RINGS = 7;
 const RING_SPACING = 4.2;
 const CORE_RADIUS = 3.6;
-const GATE_TOLERANCE = 0.45; // Angular tolerance in radians (~26 degrees)
+const GATE_TOLERANCE = 0.6; // Angular tolerance increased for easier alignment (~34 degrees)
 
 const RING_SPEEDS = {
   1: 0.18,  // Innermost ring
@@ -1214,7 +1214,7 @@ game.followers.forEach((f, idx) => {
 
 // 3. Kaurava Guard Warriors (Defined Spearmen with Red Armor scaling per ring)
 game.guards.forEach(g => {
-  const scale = 0.98 + (8 - g.ring) * 0.08;
+  const scale = 1.4 + (8 - g.ring) * 0.08; // increased guard size
   const gWarrior = buildDetailedWarrior({
     role: 'guard',
     armorColor: g.ring <= 3 ? 0x450a0a : 0x991b1b,
